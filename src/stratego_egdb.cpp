@@ -30,6 +30,7 @@
 //   entry; only for databases in which red is the only side that can win (e.g. KL-LS).
 // -bits <key>: win/draw bits for red to move plus distances where red is free (only red can win); -check <key> also
 //   builds it normally and compares every state. With -load the bits are read from dump/ (then -pos works on them).
+// -strategic (before -bits): list the positions with nobody restricted that are drawn whichever side is to move.
 // -prefer: in main lines the winner prefers moving its lowest piece towards the opponent's lowest piece (among the
 //   moves that keep the fastest win).
 // -pos <red> <blue> <r|b>: after building or loading, print the value, a diagram and the main line of one position,
@@ -46,6 +47,7 @@
 #include <format>
 #include <iostream>
 #include <map>
+#include <omp.h>
 #include <memory>
 #include <string>
 #include <vector>
@@ -941,6 +943,41 @@ BitsDb build_bits(Slice const& base, std::string const& key)
 }
 
 std::unique_ptr<BitsDb> bits_db;        // the -bits database, for -pos
+bool strategic = false;                 // -strategic: list the states drawn with either side to move (nobody restricted)
+
+// -strategic: every placement in which nobody is restricted and the result is a draw whichever side is to move
+void list_strategic(BitsDb& db, std::string const& key)
+{
+        auto& sl = db.sl;
+        auto const stride = sl.ws * sl.bs;
+        std::vector<std::vector<std::string>> found(64);
+        std::uint64_t total = 0, drawn_r = 0, drawn_b = 0, both = 0;
+#pragma omp parallel for schedule(dynamic, 1 << 10) reduction(+ : total, drawn_r, drawn_b, both)
+        for (std::int64_t pp = 0; pp < static_cast<std::int64_t>(sl.place); ++pp) {
+                auto const i = static_cast<std::uint64_t>(pp) * stride;
+                auto const r = decode(sl, i, 0);
+                if (!valid(r)) { continue; }
+                ++total;
+                auto const dr = !db.W.test(i);
+                auto const db_ = !blue_value(db, decode(sl, i, 1)).first;
+                drawn_r += dr; drawn_b += db_;
+                if (dr && db_) {
+                        ++both;
+                        std::string line;
+                        for (auto sd = 0; sd < 2; ++sd) {
+                                for (auto k = 0; k < r.side[sd].n; ++k) { line += std::format("{}{}{} ", sd == 0 ? "r" : "b", letter(r.side[sd].rk[k]), nm(r.side[sd].sq[k])); }
+                        }
+                        found[std::size_t(omp_get_thread_num()) % 64].push_back(line);
+                }
+        }
+        auto const name = std::format("dump/strategic_k{}_{}.txt", unlimited() ? std::string("inf") : std::to_string(K), key);
+        if (auto f = std::fopen(name.c_str(), "w")) {
+                for (auto const& v : found) { for (auto const& l : v) { std::fputs((l + "\n").c_str(), f); } }
+                std::fclose(f);
+        }
+        std::cout << std::format("{:6} strategisch: {} plaatsingen (symmetrisch, niemand beperkt), remise rood aan zet {}, blauw aan zet {}, beide {} ({:.2f}%) -> {}\n",
+                key, total, drawn_r, drawn_b, both, 100.0 * double(both) / double(total), name) << std::flush;
+}
 
 // statistics of a bits database (red to move from the bits, blue to move by one ply)
 void report_bits(BitsDb& db, std::string const& key)
@@ -1045,7 +1082,12 @@ void build(std::string const& red0, std::string const& blue0)
         sl.size = sl.place * sl.ws * sl.bs;
         auto const size = sl.size;
         if (sl.lean) { build_lean(sl, key, t0); return; }
-        if (key == bits_key && !check_bits) { bits_db = std::make_unique<BitsDb>(build_bits(sl, key)); if (!load) { report_bits(*bits_db, key); } return; }
+        if (key == bits_key && !check_bits) {
+                bits_db = std::make_unique<BitsDb>(build_bits(sl, key));
+                if (!load) { report_bits(*bits_db, key); }
+                if (strategic) { list_strategic(*bits_db, key); }
+                return;
+        }
         sl.val.assign(2 * size, UNKNOWN);
         if (load) {
                 auto const base = std::format("dump/k{}_{}.db", unlimited() ? std::string("inf") : std::to_string(K), key);
@@ -1304,6 +1346,7 @@ int main(int argc, char* argv[])
         if (a < argc && std::string(argv[a]) == "-load") { load = true; ++a; }
         if (a < argc && std::string(argv[a]) == "-prefer") { prefer = true; ++a; }
         if (a + 1 < argc && std::string(argv[a]) == "-lean") { lean_key = argv[a + 1]; a += 2; }
+        if (a < argc && std::string(argv[a]) == "-strategic") { strategic = true; ++a; }
         if (a + 1 < argc && (std::string(argv[a]) == "-bits" || std::string(argv[a]) == "-check")) { check_bits = std::string(argv[a]) == "-check"; bits_key = argv[a + 1]; a += 2; }
         // -pos <red> <blue> <r|b>, e.g. -pos Le5,Se1 Lf2 r: diagram and main line (the databases must be built or loaded)
         std::array<std::string, 3> pos_arg{};
