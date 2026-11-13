@@ -1165,9 +1165,13 @@ inline bool blue_attack(Pos const& p, int from, int to)
         if (R.sq < 0) { return false; }
         auto const prev = nb[R.sq][R.dir];
         if (prev < 0) { return false; }
-        auto threatened_before = false;                 // was the red piece next to a blue piece before it moved (it evaded)?
-        for (auto z : nb[prev]) { if (z >= 0 && p.side[1].at(z) >= 0) { threatened_before = true; } }
-        if (!threatened_before) { return false; }
+        // active chase: blue's last move threatened the red piece (blue's last moved piece stands next to the square that
+        // red piece came from) and red's last move evaded with exactly that piece
+        auto const& Rb = p.side[1].r;
+        if (Rb.sq < 0) { return false; }
+        auto threatened_by_last = false;
+        for (auto z : nb[prev]) { if (z == Rb.sq) { threatened_by_last = true; } }
+        if (!threatened_by_last) { return false; }
         for (auto y : nb[to]) { if (y >= 0 && p.side[0].at(y) >= 0) { return true; } }    // threatening any red piece
         return false;
 }
