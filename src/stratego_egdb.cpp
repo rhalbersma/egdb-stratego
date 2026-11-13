@@ -21,8 +21,11 @@
 // 253 = unreachable restriction state.
 // Output per database: result percentages per side to move, longest win, verification, and the longest red win with
 // red to move as a diagram with principal variation (winner: fastest win, loser: slowest loss).
-// Usage: stratego_egdb [-k <limit>|-k inf] <red> <blue> [<red> <blue> ...], e.g. "L S" "LL S" "KL L".
+// Usage: stratego_egdb [-k <limit>|-k inf] [-load] <red> <blue> [<red> <blue> ...] [-pos <red> <blue> <r|b>], e.g. "L S" "LL S" "KL L".
 // -k: at most <limit> consecutive moves of one piece between the same two squares (default 3), inf = no rule.
+// -load: read the databases from dump/ (as written by an earlier run) instead of computing them.
+// -pos <red> <blue> <r|b>: after building or loading, print the value, a diagram and the main line of one position,
+//   e.g. stratego_egdb -k 3 -load L LS -pos Le5,Se1 Lf2 r
 
 #include <algorithm>
 #include <array>
@@ -46,6 +49,7 @@ inline int rev(int d) { return d ^ 2; }
 // Tweeveldenregel limit: a piece may make at most K consecutive moves between the same two squares (K = 3: count 0..2).
 // K = 0 means unlimited (no restriction state at all).
 int K = 3;
+bool load = false;      // -load: read existing databases from dump/ instead of computing them
 inline bool unlimited() { return K == 0; }
 
 inline std::uint64_t prank(int a, int b) { return std::uint64_t(b) * (b - 1) / 2 + a; }
@@ -383,6 +387,14 @@ void build(std::string const& red0, std::string const& blue0)
         sl.size = sl.place * sl.ws * sl.bs;
         auto const size = sl.size;
         sl.val.assign(2 * size, UNKNOWN);
+        if (load) {
+                auto const full = std::format("dump/k{}_{}.db", unlimited() ? std::string("inf") : std::to_string(K), key);
+                if (auto f = std::fopen(full.c_str(), "rb")) {
+                        auto const got = std::fread(sl.val.data(), 1, sl.val.size(), f);
+                        std::fclose(f);
+                        if (got == sl.val.size()) { std::cout << std::format("{:6} geladen uit {}\n", key, full); return; }
+                }
+        }
         std::array<std::vector<std::uint8_t>, 2> cnt, out, done;
         for (auto s = 0; s < 2; ++s) { cnt[s].assign(size, 0); out[s].assign(size, UNKNOWN); done[s].assign(size, 0); }
 
@@ -582,10 +594,35 @@ int main(int argc, char* argv[])
         auto a = 1;
         if (argc > 2 && std::string(argv[1]) == "-k") { K = std::string(argv[2]) == "inf" ? 0 : std::stoi(argv[2]); a = 3; }
         std::cout << "tweeveldenregel: " << (unlimited() ? std::string("onbeperkt") : std::format("max {} zetten achter elkaar tussen twee velden", K)) << "\n\n";
+        if (a < argc && std::string(argv[a]) == "-load") { load = true; ++a; }
+        // -pos <red> <blue> <r|b>, e.g. -pos Le5,Se1 Lf2 r: diagram and main line (the databases must be built or loaded)
+        std::array<std::string, 3> pos_arg{};
+        auto have_pos = false;
+        for (auto b = a; b < argc; ++b) { if (std::string(argv[b]) == "-pos" && b + 3 < argc) { pos_arg = { argv[b + 1], argv[b + 2], argv[b + 3] }; have_pos = true; argc = b; break; } }
         for (; a + 1 < argc; a += 2) {
                 std::string red = argv[a], blue = argv[a + 1];
                 auto const desc = [](std::string& s) { std::ranges::sort(s, [](char x, char y) { return rank_of(x) > rank_of(y); }); };
                 desc(red); desc(blue);
                 build(red, blue);
+        }
+        if (have_pos) {
+                Pos p;
+                for (auto s = 0; s < 2; ++s) {
+                        auto const& t = pos_arg[s];
+                        for (std::size_t i = 0; i < t.size();) {
+                                auto const j = std::min(t.find(',', i), t.size());
+                                auto const tok = t.substr(i, j - i);
+                                auto const f = tok[1] - 'a', r = std::stoi(tok.substr(2)) - 1;
+                                for (auto x = 0; x < N; ++x) { if (fo[x] == f && ro[x] == r) { p.side[s].sq[p.side[s].n] = x; } }
+                                p.side[s].rk[p.side[s].n++] = rank_of(tok[0]);
+                                i = j + 1;
+                        }
+                        p.side[s].normalise();
+                }
+                p.stm = pos_arg[2] == "r" ? 0 : 1;
+                auto const v = child_value(p);
+                std::cout << "\nwaarde voor de kant aan zet: " << (v >= DRAW ? std::string("remise") : std::format("{} in {} plies", (v & 1) ? "winst" : "verlies", int(v))) << "\n";
+                diagram(p);
+                pv(p);
         }
 }

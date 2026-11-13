@@ -3,9 +3,9 @@
 #    (See accompanying file LICENSE_1_0.txt or copy at
 #          http://www.boost.org/LICENSE_1_0.txt)
 
-# Red wins with red to move, restricted to positions in which nobody is restricted and red cannot attack at once
-# (no red piece orthogonally next to a blue piece). Reads the dumps dump/k<limit>_<key>.bin written by stratego_egdb:
-# one byte per (placement, side to move) for the states in which nobody is restricted.
+# Red wins in the positions in which nobody is restricted and nobody can attack at once (no red piece orthogonally
+# next to a blue piece), per side to move. Cell: longest red win red to move / blue to move (red wins %, same order).
+# Reads the dumps dump/k<limit>_<key>.bin written by stratego_egdb: one byte per (placement, side to move) for the states in which nobody is restricted.
 # Usage: python3 scripts/no_capture.py <dump directory> <limit> [<limit> ...]   e.g. dump 1 2 3 4 5 inf
 import os, sys
 
@@ -70,13 +70,16 @@ for key in keys:
             cells.append('')
             continue
         d = open(path, 'rb').read()
-        n = wins = longest = 0
+        n, wins, longest = [0, 0], [0, 0], [0, 0]
         for i, q in enumerate(quiet[key]):
-            if q:
-                v = d[2 * i]
-                n += 1
-                if v < 253 and v % 2 == 1:
-                    wins += 1
-                    longest = max(longest, v)
-        cells.append(f'{longest or "—"} ({100 * wins / n:.1f}%)')
+            if not q:
+                continue
+            for stm in (0, 1):
+                v = d[2 * i + stm]
+                n[stm] += 1
+                if v < 253 and v % 2 == (1 if stm == 0 else 0):     # red wins: odd for red to move, even for blue
+                    wins[stm] += 1
+                    longest[stm] = max(longest[stm], v)
+        lw = ' / '.join(str(x) if x else '—' for x in longest)
+        cells.append(f'{lw} ({100 * wins[0] / n[0]:.1f} / {100 * wins[1] / n[1]:.1f})')
     print(f'| {key} | ' + ' | '.join(cells) + ' |')
