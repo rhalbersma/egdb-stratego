@@ -23,9 +23,11 @@
 // 253 = unreachable restriction state.
 // Output per database: result percentages per side to move, longest win, verification, and the longest red win with
 // red to move as a diagram with principal variation (winner: fastest win, loser: slowest loss).
-// Usage: stratego_egdb [-k <limit>|-k inf] [-load] [-prefer] <red> <blue> [<red> <blue> ...] [-pos <red> <blue> <r|b>], e.g. "L S" "LL S" "KL L".
+// Usage: stratego_egdb [-k <limit>|-k inf] [-load] [-prefer] [-lean <key>] <red> <blue> [<red> <blue> ...] [-pos <red> <blue> <r|b>], e.g. "L S" "LL S" "KL L".
 // -k: at most <limit> consecutive moves of one piece between the same two squares (default 3), inf = no rule.
 // -load: read the databases from dump/ (as written by an earlier run) instead of computing them.
+// -lean <key>: build that database with the board symmetry (the unique highest red piece in a1-e5) and one byte per
+//   entry; only for databases in which red is the only side that can win (e.g. KL-LS).
 // -prefer: in main lines the winner prefers moving its lowest piece towards the opponent's lowest piece (among the
 //   moves that keep the fastest win).
 // -pos <red> <blue> <r|b>: after building or loading, print the value, a diagram and the main line of one position,
@@ -33,6 +35,8 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
+#include <stdexcept>
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
@@ -168,10 +172,43 @@ struct Slice
         int ng = 0;
         std::uint64_t place = 0, ws = 0, bs = 0, size = 0;
         std::vector<value_t> val;                       // index * 2 + side to move
+        // lean storage (-lean): one byte per entry, only for databases in which red is the only side that can win;
+        // the red king (the unique highest red piece) is mirrored into the quadrant a1-e5 (sym)
+        bool lean = false, sym = false;
+        std::vector<std::uint8_t> val8, out8, cnt4;
 };
+
+// Board symmetries: identity, mirror files (a<->j), mirror ranks (1<->10), both. The lakes map onto themselves and no
+// square is fixed, so a position whose unique piece is mirrored into the quadrant a1-e5 has exactly one image there.
+std::array<std::array<int, N>, 4> msq{};
+constexpr std::array<std::array<int, 4>, 4> mdir{ { { 0, 1, 2, 3 }, { 0, 3, 2, 1 }, { 2, 1, 0, 3 }, { 2, 3, 0, 1 } } };
+std::array<int, N> qidx{};                       // index of a square in the quadrant, -1 outside
+std::vector<int> qsq;                            // the quadrant squares
+std::string lean_key;                            // -lean <key>: build this database in lean, symmetric form
+
+inline void symmetrize(Pos& p)
+{
+        auto const k = p.side[0].sq[0];                         // the unique highest red piece (sorted first)
+        auto const t = (fo[k] >= W / 2 ? 1 : 0) | (ro[k] >= H / 2 ? 2 : 0);
+        if (t == 0) { return; }
+        for (auto& sd : p.side) {
+                for (auto i = 0; i < sd.n; ++i) { sd.sq[i] = msq[t][sd.sq[i]]; }
+                if (sd.r.sq >= 0) { sd.r.sq = msq[t][sd.r.sq]; sd.r.dir = mdir[t][sd.r.dir]; }
+                sd.normalise();
+        }
+}
 std::map<std::string, Slice> slices;
 
+std::uint64_t encode_raw(Slice const& sl, Pos const& p);
 std::uint64_t encode(Slice const& sl, Pos const& p)
+{
+        if (!sl.sym) { return encode_raw(sl, p); }
+        auto q = p;
+        symmetrize(q);
+        return encode_raw(sl, q);
+}
+
+std::uint64_t encode_raw(Slice const& sl, Pos const& p)
 {
         std::array<int, 4> used{};
         auto nu = 0;
@@ -183,7 +220,7 @@ std::uint64_t encode(Slice const& sl, Pos const& p)
                         auto const x = s.sq[sl.gfirst[g] + k];
                         auto below = 0;
                         for (auto u = 0; u < nu; ++u) { below += used[u] < x; }
-                        c[k] = x - below;
+                        c[k] = (g == 0 && sl.sym) ? qidx[x] : x - below;
                 }
                 for (auto k = 0; k < sl.gcount[g]; ++k) { used[nu++] = s.sq[sl.gfirst[g] + k]; }
                 idx = idx * sl.radix[g] + (sl.gcount[g] == 1 ? std::uint64_t(c[0]) : prank(c[0], c[1]));
@@ -212,6 +249,7 @@ Pos decode(Slice const& sl, std::uint64_t idx, int stm)
                 std::array<int, 2> placed{};
                 for (auto k = 0; k < sl.gcount[g]; ++k) {
                         auto x = c[k];
+                        if (g == 0 && sl.sym) { placed[k] = qsq[x]; continue; }
                         std::array<int, 4> su = used;
                         std::sort(su.begin(), su.begin() + nu);
                         for (auto u = 0; u < nu; ++u) { if (su[u] <= x) { ++x; } }
@@ -288,6 +326,30 @@ inline Canon const& canonicalise(Pos& p)
         return t;
 }
 
+// lean byte encoding: red to move stores (n + 1) / 2 for a red win in n (odd) plies, blue to move stores n / 2 for a
+// blue loss in n (even) plies; 253 = draw, 254 = invalid, 255 = unknown. Up to 504 plies.
+inline std::uint8_t to8(value_t v, int stm)
+{
+        if (v == DRAW) { return 253; }
+        if (v == INVALID) { return 254; }
+        if (v == UNKNOWN) { return 255; }
+        if (int(v & 1) != (stm == 0 ? 1 : 0)) { throw std::runtime_error("lean: blue can win in this database"); }
+        auto const b = stm == 0 ? (v + 1) / 2 : v / 2;
+        if (b > 252) { throw std::runtime_error("lean: win longer than 504 plies"); }
+        return static_cast<std::uint8_t>(b);
+}
+inline value_t from8(std::uint8_t b, int stm)
+{
+        if (b == 253) { return DRAW; }
+        if (b == 254) { return INVALID; }
+        if (b == 255) { return UNKNOWN; }
+        return static_cast<value_t>(stm == 0 ? 2 * b - 1 : 2 * b);
+}
+inline value_t slice_value(Slice const& sl, std::uint64_t i, int stm)
+{
+        return sl.lean ? from8(sl.val8[i * 2 + std::uint64_t(stm)], stm) : sl.val[i * 2 + std::uint64_t(stm)];
+}
+
 value_t child_value(Pos const& c0)
 {
         auto const& me0 = c0.side[c0.stm];
@@ -297,7 +359,7 @@ value_t child_value(Pos const& c0)
         if (op0.n == 0) { return 1; }
         auto c = c0;
         auto const& t = canonicalise(c);
-        auto const v = t.slice->val[encode(*t.slice, c) * 2 + std::uint64_t(c.stm)];
+        auto const v = slice_value(*t.slice, encode(*t.slice, c), c.stm);
         return v == UNKNOWN ? DRAW : v;
 }
 
@@ -418,6 +480,180 @@ void pv(Pos p)
         std::cout << '\n';
 }
 
+// Lean, symmetric build for one database in which only red can win (-lean). One byte per entry for the value and
+// for the best capture value, a 4-bit move counter per side to move, no queues: every level is a scan over the table.
+void build_lean(Slice& sl, std::string const& key, std::chrono::steady_clock::time_point t0)
+{
+        using clock = std::chrono::steady_clock;
+        auto const size = sl.size;
+        auto const name = std::format("dump/k{}_{}.db8", unlimited() ? std::string("inf") : std::to_string(K), key);
+        sl.val8.assign(2 * size, 255);
+        if (load) {
+                if (auto f = std::fopen(name.c_str(), "rb")) {
+                        auto const got = std::fread(sl.val8.data(), 1, sl.val8.size(), f);
+                        std::fclose(f);
+                        if (got == sl.val8.size()) { std::cout << std::format("{:6} geladen uit {}\n", key, name); return; }
+                }
+        }
+        sl.out8.assign(2 * size, 255);
+        sl.cnt4.assign(size, 0);
+        auto const at = [](std::uint8_t& b) { return std::atomic_ref<std::uint8_t>(b); };
+
+#pragma omp parallel for schedule(dynamic, 1 << 14)
+        for (std::int64_t ii = 0; ii < static_cast<std::int64_t>(size); ++ii) {
+                auto const i = static_cast<std::uint64_t>(ii);
+                std::uint8_t counts = 0;
+                for (auto s = 0; s < 2; ++s) {
+                        auto const p = decode(sl, i, s);
+                        if (!valid(p)) { sl.val8[i * 2 + s] = 254; continue; }
+                        auto inside = 0;
+                        auto best = UNKNOWN;
+                        auto const n = for_each_move(p, [&](Pos const& c, bool in, auto&&...) {
+                                if (in) { ++inside; return; }
+                                auto const v = backup(child_value(c));
+                                if (best == UNKNOWN || pref(v) > pref(best)) { best = v; }
+                        });
+                        if (n == 0) { sl.val8[i * 2 + s] = to8(terminal(p), s); continue; }
+                        if (inside == 0) { sl.val8[i * 2 + s] = to8(best, s); continue; }
+                        counts |= static_cast<std::uint8_t>(inside << (4 * s));
+                        sl.out8[i * 2 + s] = to8(best, s);
+                }
+                sl.cnt4[i] = counts;
+        }
+        std::cout << std::format("{:6} initialisatie klaar na {:.0f}s\n", key, std::chrono::duration<double>(clock::now() - t0).count()) << std::flush;
+
+        auto longest = 0;
+        for (auto lv = 0; lv <= 504; ++lv) {
+                auto const s = lv % 2 == 0 ? 1 : 0;             // even: blue to move loses, odd: red to move wins
+                auto const mv = 1 - s;
+                auto const code = to8(static_cast<value_t>(lv), s);
+                std::uint64_t processed = 0;
+#pragma omp parallel for schedule(dynamic, 1 << 16) reduction(+ : processed)
+                for (std::int64_t ii = 0; ii < static_cast<std::int64_t>(size); ++ii) {
+                        auto const i = static_cast<std::uint64_t>(ii);
+                        auto cur = at(sl.val8[i * 2 + s]).load(std::memory_order_relaxed);
+                        if (cur == 255 && s == 0 && sl.out8[i * 2 + s] == code) {       // a win by a capture, not faster inside
+                                auto expected = std::uint8_t{255};
+                                if (at(sl.val8[i * 2 + s]).compare_exchange_strong(expected, code)) { cur = code; } else { cur = expected; }
+                        }
+                        if (cur != code) { continue; }
+                        ++processed;
+                        auto const child = decode(sl, i, s);
+                        auto const visit_index = [&](std::uint64_t pi) {
+                                auto& pb = sl.val8[pi * 2 + mv];
+                                if (at(pb).load(std::memory_order_relaxed) != 255) { return; }
+                                if (lv % 2 == 0) {                      // the child loses: the parent wins at lv + 1
+                                        auto expected = std::uint8_t{255};
+                                        at(pb).compare_exchange_strong(expected, to8(static_cast<value_t>(lv + 1), mv));
+                                        return;
+                                }
+                                auto const old = at(sl.cnt4[pi]).fetch_sub(static_cast<std::uint8_t>(1 << (4 * mv)));
+                                if (((old >> (4 * mv)) & 15) != 1) { return; }
+                                auto const o = from8(sl.out8[pi * 2 + mv], mv);
+                                auto L = -1;
+                                if (o == UNKNOWN) { L = lv + 1; } else if (o < DRAW && !(o & 1)) { L = std::max(lv + 1, int(o)); }
+                                if (L >= 0) { auto expected = std::uint8_t{255}; at(pb).compare_exchange_strong(expected, to8(static_cast<value_t>(L), mv)); }
+                        };
+                        auto const& R = child.side[mv].r;
+                        if (unlimited()) {
+                                for (auto k = 0; k < child.side[mv].n; ++k) {
+                                        auto const y = child.side[mv].sq[k];
+                                        for (auto d = 0; d < 4; ++d) {
+                                                auto const x = nb[y][d];
+                                                if (x < 0 || child.occupied(x)) { continue; }
+                                                auto pp = child;
+                                                pp.stm = mv;
+                                                pp.side[mv].sq[k] = x;
+                                                pp.side[mv].normalise();
+                                                visit_index(encode(sl, pp));
+                                        }
+                                }
+                                continue;
+                        }
+                        if (R.sq < 0) { continue; }
+                        auto const y = R.sq, x = nb[y][R.dir], e = rev(R.dir);
+                        if (x < 0 || child.occupied(x)) { continue; }
+                        auto parent = child;
+                        parent.stm = mv;
+                        auto& P = parent.side[mv];
+                        P.sq[P.at(y)] = x;
+                        P.normalise();
+                        auto const visit = [&](Restr const& prev) { auto pp = parent; pp.side[mv].r = prev; visit_index(encode(sl, pp)); };
+                        if (R.cnt < K - 1) {
+                                visit({ x, e, R.cnt + 1 });
+                        } else {
+                                visit({});
+                                for (auto d = 0; d < 4; ++d) {
+                                        if (d == e || nb[x][d] < 0) { continue; }
+                                        for (auto c = 0; c < K; ++c) { visit({ x, d, c }); }
+                                }
+                                for (auto k = 0; k < child.side[mv].n; ++k) {
+                                        auto const other = child.side[mv].sq[k];
+                                        if (other == y) { continue; }
+                                        for (auto d = 0; d < 4; ++d) {
+                                                if (nb[other][d] < 0) { continue; }
+                                                for (auto c = 0; c < K; ++c) { visit({ other, d, c }); }
+                                        }
+                                }
+                        }
+                }
+                if (processed > 0) { longest = lv; }
+                if (lv % 50 == 49) { std::cout << std::format("{:6} niveau {} na {:.0f}s\n", key, lv + 1, std::chrono::duration<double>(clock::now() - t0).count()) << std::flush; }
+        }
+        std::vector<std::uint8_t>().swap(sl.out8);
+        std::vector<std::uint8_t>().swap(sl.cnt4);
+        for (auto& b : sl.val8) { if (b == 255) { b = 253; } }
+
+        std::uint64_t errors = 0;
+#pragma omp parallel for schedule(dynamic, 1 << 14) reduction(+ : errors)
+        for (std::int64_t ii = 0; ii < static_cast<std::int64_t>(size); ++ii) {
+                auto const i = static_cast<std::uint64_t>(ii);
+                for (auto s = 0; s < 2; ++s) {
+                        if (sl.val8[i * 2 + s] == 254) { continue; }
+                        auto const p = decode(sl, i, s);
+                        errors += encode(sl, p) != i;
+                        auto best = UNKNOWN;
+                        auto const n = for_each_move(p, [&](Pos const& c, bool, auto&&...) {
+                                auto const v = backup(child_value(c));
+                                if (best == UNKNOWN || pref(v) > pref(best)) { best = v; }
+                        });
+                        if (n == 0) { best = terminal(p); }
+                        errors += best != from8(sl.val8[i * 2 + s], s);
+                }
+        }
+
+        std::array<std::array<std::uint64_t, 3>, 2> all{}, fresh{};
+        std::array<int, 2> lw{};
+        std::array<std::uint64_t, 2> lwi{};
+        for (auto s = 0; s < 2; ++s) {
+                for (auto i = std::uint64_t{0}; i < size; ++i) {
+                        auto const v = from8(sl.val8[i * 2 + s], s);
+                        if (v == INVALID) { continue; }
+                        auto const k = v >= DRAW ? 1 : ((s == 0) == bool(v & 1)) ? 0 : 2;
+                        ++all[s][k];
+                        if (i % (sl.ws * sl.bs) == 0) { ++fresh[s][k]; if (k == 0 && v > lw[s]) { lw[s] = v; lwi[s] = i; } }
+                }
+        }
+        std::cout << std::format("{:6} {:11} toestanden per kant (symmetrisch, lean), {:5.1f}s, langste {:3} plies, verify {}\n", key, size,
+                std::chrono::duration<double>(clock::now() - t0).count(), longest, errors == 0 ? "OK" : std::format("{} ERRORS", errors));
+        for (auto s = 0; s < 2; ++s) {
+                auto const pct = [&](auto const& a, int k) { auto const t = double(a[s][0] + a[s][1] + a[s][2]); return 100.0 * double(a[s][k]) / t; };
+                std::cout << std::format("       {} aan zet | alle toestanden: rood {:5.1f}% remise {:5.1f}% blauw {:5.1f}% | niemand beperkt: rood {:5.1f}% remise {:5.1f}% blauw {:5.1f}%",
+                        s == 0 ? "rood " : "blauw", pct(all, 0), pct(all, 1), pct(all, 2), pct(fresh, 0), pct(fresh, 1), pct(fresh, 2));
+                if (lw[s]) { std::cout << std::format("  langste rode winst {} plies: {}", lw[s], describe(decode(sl, lwi[s], s))); }
+                std::cout << '\n';
+        }
+        if (auto f = std::fopen(name.c_str(), "wb")) { std::fwrite(sl.val8.data(), 1, sl.val8.size(), f); std::fclose(f); }
+        if (lw[0]) {
+                std::cout << std::format("\nlangste rode winst met rood aan zet in {}: {} plies\n", key, lw[0]);
+                auto const p = decode(sl, lwi[0], 0);
+                diagram(p);
+                pv(p);
+                std::cout << '\n';
+        }
+        std::cout << std::flush;
+}
+
 void build(std::string const& red0, std::string const& blue0)
 {
         std::array<std::vector<int>, 2> rk;
@@ -450,7 +686,13 @@ void build(std::string const& red0, std::string const& blue0)
                 for (auto k = 0u; k < v.size();) {
                         auto j = k; while (j < v.size() && v[j] == v[k]) { ++j; }
                         sl.gside[sl.ng] = s; sl.gcount[sl.ng] = int(j - k); sl.gfirst[sl.ng] = int(k);
-                        sl.radix[sl.ng] = binom(free, int(j - k)); sl.place *= sl.radix[sl.ng]; free -= int(j - k);
+                        sl.radix[sl.ng] = binom(free, int(j - k));
+                        if (sl.ng == 0 && key == lean_key) {
+                                if (s != 0 || j - k != 1) { throw std::invalid_argument("-lean needs a unique highest red piece"); }
+                                sl.lean = sl.sym = true;
+                                sl.radix[0] = qsq.size();
+                        }
+                        sl.place *= sl.radix[sl.ng]; free -= int(j - k);
                         ++sl.ng; k = j;
                 }
         }
@@ -458,6 +700,7 @@ void build(std::string const& red0, std::string const& blue0)
         sl.bs = unlimited() ? 1 : 1 + 4 * std::uint64_t(K) * std::uint64_t(sl.n[1]);
         sl.size = sl.place * sl.ws * sl.bs;
         auto const size = sl.size;
+        if (sl.lean) { build_lean(sl, key, t0); return; }
         sl.val.assign(2 * size, UNKNOWN);
         if (load) {
                 auto const base = std::format("dump/k{}_{}.db", unlimited() ? std::string("inf") : std::to_string(K), key);
@@ -696,6 +939,13 @@ int main(int argc, char* argv[])
         for (auto s = 0; s < N; ++s) { for (auto d = 0; d < 4; ++d) { auto const f = fo[s] + df[d], r = ro[s] + dr[d]; nb[s][d] = (f < 0 || f >= W || r < 0 || r >= H) ? -1 : id[f][r]; } }
         for (auto b = 1; b < N; ++b) { for (auto a = 0; a < b; ++a) { pairs.push_back({ a, b }); } }
         init_canon();
+        for (auto x = 0; x < N; ++x) {          // symmetries and the quadrant a1-e5
+                auto const f = fo[x], r = ro[x];
+                int const ff[4] = { f, W - 1 - f, f, W - 1 - f }, rr[4] = { r, r, H - 1 - r, H - 1 - r };
+                for (auto t = 0; t < 4; ++t) { for (auto y = 0; y < N; ++y) { if (fo[y] == ff[t] && ro[y] == rr[t]) { msq[t][x] = y; } } }
+                qidx[x] = -1;
+                if (f < W / 2 && r < H / 2) { qidx[x] = int(qsq.size()); qsq.push_back(x); }
+        }
         for (auto x = 0; x < N; ++x) {          // breadth-first distances from every square
                 for (auto& v : dist[x]) { v = 1000; }
                 std::vector<int> q{ x };
@@ -707,6 +957,7 @@ int main(int argc, char* argv[])
         std::cout << "tweeveldenregel: " << (unlimited() ? std::string("onbeperkt") : std::format("max {} zetten achter elkaar tussen twee velden", K)) << "\n\n";
         if (a < argc && std::string(argv[a]) == "-load") { load = true; ++a; }
         if (a < argc && std::string(argv[a]) == "-prefer") { prefer = true; ++a; }
+        if (a + 1 < argc && std::string(argv[a]) == "-lean") { lean_key = argv[a + 1]; a += 2; }
         // -pos <red> <blue> <r|b>, e.g. -pos Le5,Se1 Lf2 r: diagram and main line (the databases must be built or loaded)
         std::array<std::string, 3> pos_arg{};
         auto have_pos = false;
