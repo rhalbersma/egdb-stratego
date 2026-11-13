@@ -1145,26 +1145,29 @@ void forward_solve(Slice& sl)
         std::ranges::replace(sl.val, UNKNOWN, DRAW);
 }
 
-// Is this blue move a chasing move? A chase is attack, evade, attack again: blue moves next to a red piece it threatens,
-// and that red piece has just evaded, i.e. its last move started on a square next to a blue piece that threatened it.
-// The two-square state tells which red piece moved last and where it came from. Without it (k = inf) every approach
-// to a threatened red piece counts; when no red move is known yet (red unrestricted) nothing counts.
+std::unique_ptr<Pos> trace;              // -trace (with -realdraw and -pos): explain one state
+bool chase_equal_only = false;          // (no longer used)
+
+// Is this blue move a chasing move in the sense of ISF rule 11 (more-squares rule)? To threaten is to move a piece next to
+// an opponent piece (any rank); to evade is to move the threatened piece away in the very next move; a chasing move
+// threatens a piece that has just evaded. Exception 11.2: a chasing move back to the square the chasing piece came from
+// in the directly preceding turn is allowed, but it does not interrupt the chase. The two-square state tells
+// which piece of each side moved last and where it came from. At k = inf this is not known: then every move next to a
+// red piece counts.
 inline bool blue_attack(Pos const& p, int from, int to)
 {
         if (p.stm != 1 || p.side[0].at(to) >= 0) { return false; }
-        auto const i = p.side[1].at(from);
-        auto const& R = p.side[0].r;
-        auto const prev = R.sq >= 0 ? nb[R.sq][R.dir] : -1;     // where the red piece that moved last came from
-        for (auto y : nb[to]) {
-                auto const t = y >= 0 ? p.side[0].at(y) : -1;
-                if (t < 0 || attack(p.side[1].rk[i], p.side[0].rk[t]) < 0) { continue; }
-                if (unlimited()) { return true; }
-                if (y != R.sq || prev < 0) { continue; }
-                for (auto z : nb[prev]) {                       // was it threatened there by a blue piece?
-                        auto const b = z >= 0 ? p.side[1].at(z) : -1;
-                        if (b >= 0 && attack(p.side[1].rk[b], p.side[0].rk[t]) >= 0) { return true; }
-                }
-        }
+        if (unlimited()) { for (auto y : nb[to]) { if (y >= 0 && p.side[0].at(y) >= 0) { return true; } } return false; }
+        // (exception 11.2, back to the previous square, is allowed but does not end the continuous chase; a pure pendulum
+        // is limited by the two-square rule, which is in the state)
+        auto const& R = p.side[0].r;                    // red's last move: from prev to R.sq
+        if (R.sq < 0) { return false; }
+        auto const prev = nb[R.sq][R.dir];
+        if (prev < 0) { return false; }
+        auto threatened_before = false;                 // was the red piece next to a blue piece before it moved (it evaded)?
+        for (auto z : nb[prev]) { if (z >= 0 && p.side[1].at(z) >= 0) { threatened_before = true; } }
+        if (!threatened_before) { return false; }
+        for (auto y : nb[to]) { if (y == R.sq) { return true; } }      // threatening the piece that just evaded
         return false;
 }
 
@@ -1209,57 +1212,47 @@ void real_draws(Slice const& sl, std::string const& key)
                 return changed;
         };
         auto const in_set = [&](std::vector<std::uint8_t> const& X, Pos const& c, bool in) { return in ? bool(X[encode(sl, c) * 2 + std::uint64_t(c.stm)]) : child_value(c) >= DRAW; };
+        // Buechi for blue: a chase is allowed as long as the chaser repeats no position (11.1), so blue keeps a draw if it can
+        // make a non-chasing move infinitely often while staying in the draws; a continuous chase forever would repeat.
+        // X (greatest fixpoint): Y = states from which blue can force a non-chasing move into X (least fixpoint), X := Y.
+        (void)Z;
         auto rounds = 0;
         for (;; ++rounds) {
-                Z = D;
+                A.assign(2 * size, 0);
                 while (sweep([&](std::uint64_t i, int s) -> std::uint64_t {
-                        if (!Z[i * 2 + s]) { return 0; }
+                        if (!D[i * 2 + s] || A[i * 2 + s]) { return 0; }
                         auto const p = decode(sl, i, s);
                         auto ok = s == 0;
-                        auto quiet_red = false;
                         for_each_move(p, [&](Pos const& c, bool in, auto from, auto to) {
-                                auto const stays = in_set(Z, c, in);
-                                if (s == 0) { if (!red_chase(p, from, to)) { quiet_red = true; if (!stays) { ok = false; } } }
-                                else if (stays && !blue_attack(p, from, to)) { ok = true; }
+                                if (s == 1) {
+                                        if (!in) { if (child_value(c) >= DRAW) { ok = true; } return; }   // capture into a drawn smaller database
+                                        auto const ci = encode(sl, c) * 2 + std::uint64_t(c.stm);
+                                        if ((D[ci] && !blue_attack(p, from, to)) || A[ci]) { ok = true; }
+                                } else {
+                                        if (!in) { if (child_value(c) < DRAW) { ok = false; } return; }
+                                        if (!A[encode(sl, c) * 2 + std::uint64_t(c.stm)]) { ok = false; }
+                                }
                         });
-                        if (s == 0 && !quiet_red) { ok = true; }
-                        if (!ok) { Z[i * 2 + s] = 0; return 1; }
-                        return 0;
-                }) > 0) {}
-                A = Z;
-                while (sweep([&](std::uint64_t i, int s) -> std::uint64_t {
-                        if (A[i * 2 + s] || !D[i * 2 + s]) { return 0; }
-                        auto const p = decode(sl, i, s);
-                        auto ok = s == 0;
-                        auto quiet_red = false;
-                        for_each_move(p, [&](Pos const& c, bool in, auto from, auto to) {
-                                auto const reach = in_set(A, c, in);
-                                if (s == 0) { if (!red_chase(p, from, to)) { quiet_red = true; if (!reach) { ok = false; } } }
-                                else if (reach) { ok = true; }
-                        });
-                        if (s == 0 && !quiet_red) { ok = true; }
                         if (ok) { A[i * 2 + s] = 1; return 1; }
                         return 0;
                 }) > 0) {}
                 if (A == D) { break; }
                 D = A;
         }
-        // phase 2: red reaches its phase-1 wins with finitely many chasing moves
-        std::vector<std::uint8_t> F(2 * size, 0);
-        for (auto i = 0uz; i < 2 * size; ++i) { F[i] = D0[i] && !D[i]; }
-        while (sweep([&](std::uint64_t i, int s) -> std::uint64_t {
-                if (!D0[i * 2 + s] || F[i * 2 + s]) { return 0; }
-                auto const p = decode(sl, i, s);
-                auto ok = s == 1;
-                for_each_move(p, [&](Pos const& c, bool in, auto&&...) {
-                        auto const bad = in ? (F[encode(sl, c) * 2 + std::uint64_t(c.stm)] || !D0[encode(sl, c) * 2 + std::uint64_t(c.stm)]) : child_value(c) < DRAW;
-                        if (s == 0) { if (in && F[encode(sl, c) * 2 + std::uint64_t(c.stm)]) { ok = true; } }
-                        else if (!bad) { ok = false; }
-                });
-                if (ok) { F[i * 2 + s] = 1; return 1; }
-                return 0;
-        }) > 0) {}
-        for (auto i = 0uz; i < 2 * size; ++i) { D[i] = D0[i] && !F[i]; }
+        if (trace) {            // explain why the traced state left the phase-1 draws (two plies deep)
+                auto const show = [&](Pos const& q, int depth, auto&& self) -> void {
+                        auto const qi = encode(sl, q);
+                        std::cout << std::string(2 * depth + 6, ' ') << describe(q) << (q.stm == 0 ? " rood" : " blauw") << " aan zet, in D: " << int(D[qi * 2 + std::uint64_t(q.stm)]) << "\n";
+                        if (depth >= 2 || D[qi * 2 + std::uint64_t(q.stm)]) { return; }
+                        for_each_move(q, [&](Pos const& c, bool in, auto from, auto to) {
+                                auto const ch = q.stm == 0 ? red_chase(q, from, to) : blue_attack(q, from, to);
+                                auto const inD = in ? int(D[encode(sl, c) * 2 + std::uint64_t(c.stm)]) : (child_value(c) >= DRAW ? 2 : -1);
+                                std::cout << std::string(2 * depth + 8, ' ') << nm(from) << (in ? '-' : 'x') << nm(to) << (ch ? " (achtervolging)" : "") << " -> in D: " << inD << "\n";
+                                if (in && !inD && !ch && depth < 1) { self(c, depth + 1, self); }
+                        });
+                };
+                show(*trace, 0, show);
+        }
         std::array<std::array<std::uint64_t, 2>, 2> fresh{};    // [stm][real draws, all draws]
         std::uint64_t real = 0;
         for (auto i = 0uz; i < size; ++i) {
@@ -1624,11 +1617,32 @@ int main(int argc, char* argv[])
         if (a < argc && std::string(argv[a]) == "-walk") { walk = true; ++a; }
         if (a < argc && std::string(argv[a]) == "-noattack") { noattack = true; ++a; }
         if (a + 1 < argc && std::string(argv[a]) == "-realdraw") { realdraw_key = argv[a + 1]; a += 2; }
+        if (a < argc && std::string(argv[a]) == "-chase-equal") { chase_equal_only = true; ++a; }
+        auto trace_on = false;
+        if (a < argc && std::string(argv[a]) == "-trace") { trace_on = true; ++a; }
         if (a + 1 < argc && (std::string(argv[a]) == "-bits" || std::string(argv[a]) == "-check")) { check_bits = std::string(argv[a]) == "-check"; bits_key = argv[a + 1]; a += 2; }
         // -pos <red> <blue> <r|b>, e.g. -pos Le5,Se1 Lf2 r: diagram and main line (the databases must be built or loaded)
         std::array<std::string, 3> pos_arg{};
         auto have_pos = false;
         for (auto b = a; b < argc; ++b) { if (std::string(argv[b]) == "-pos" && b + 3 < argc) { pos_arg = { argv[b + 1], argv[b + 2], argv[b + 3] }; have_pos = true; argc = b; break; } }
+        if (trace_on && have_pos) {
+                Pos p;
+                for (auto sd = 0; sd < 2; ++sd) {
+                        auto const& t = pos_arg[sd];
+                        for (std::size_t i = 0; i < t.size();) {
+                                auto const j = std::min(t.find(',', i), t.size());
+                                auto const tok = t.substr(i, j - i);
+                                auto const f = tok[1] - 'a', r = std::stoi(tok.substr(2)) - 1;
+                                for (auto x = 0; x < N; ++x) { if (fo[x] == f && ro[x] == r) { p.side[sd].sq[p.side[sd].n] = x; } }
+                                p.side[sd].rk[p.side[sd].n++] = rank_of(tok[0]);
+                                i = j + 1;
+                        }
+                        p.side[sd].normalise();
+                }
+                p.stm = pos_arg[2] == "r" ? 0 : 1;
+                canonicalise(p);
+                trace = std::make_unique<Pos>(p);
+        }
         for (; a + 1 < argc; a += 2) {
                 std::string red = argv[a], blue = argv[a + 1];
                 auto const desc = [](std::string& s) { std::ranges::sort(s, [](char x, char y) { return rank_of(x) > rank_of(y); }); };
