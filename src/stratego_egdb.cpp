@@ -23,11 +23,13 @@
 // 253 = unreachable restriction state.
 // Output per database: result percentages per side to move, longest win, verification, and the longest red win with
 // red to move as a diagram with principal variation (winner: fastest win, loser: slowest loss).
-// Usage: stratego_egdb [-k <limit>|-k inf] [-load] [-prefer] [-lean <key>] <red> <blue> [<red> <blue> ...] [-pos <red> <blue> <r|b>], e.g. "L S" "LL S" "KL L".
+// Usage: stratego_egdb [-k <limit>|-k inf] [-load] [-prefer] [-lean <key>] [-bits <key>|-check <key>] <red> <blue> [<red> <blue> ...] [-pos <red> <blue> <r|b>], e.g. "L S" "LL S" "KL L".
 // -k: at most <limit> consecutive moves of one piece between the same two squares (default 3), inf = no rule.
 // -load: read the databases from dump/ (as written by an earlier run) instead of computing them.
 // -lean <key>: build that database with the board symmetry (the unique highest red piece in a1-e5) and one byte per
 //   entry; only for databases in which red is the only side that can win (e.g. KL-LS).
+// -bits <key>: win/draw bits for red to move plus distances where red is free (only red can win); -check <key> also
+//   builds it normally and compares every state. With -load the bits are read from dump/ (then -pos works on them).
 // -prefer: in main lines the winner prefers moving its lowest piece towards the opponent's lowest piece (among the
 //   moves that keep the fastest win).
 // -pos <red> <blue> <r|b>: after building or loading, print the value, a diagram and the main line of one position,
@@ -44,6 +46,7 @@
 #include <format>
 #include <iostream>
 #include <map>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -175,7 +178,9 @@ struct Slice
         std::vector<value_t> val;                       // index * 2 + side to move
         // lean storage (-lean): one byte per entry, only for databases in which red is the only side that can win;
         // the red king (the unique highest red piece) is mirrored into the quadrant a1-e5 (sym)
-        bool lean = false, sym = false;
+        bool lean = false, sym = false, bits = false;
+        int symg = 0;                                   // the unique piece mirrored into a1-e5 (a group of one)
+        std::array<int, 4> gord{ 0, 1, 2, 3 };          // index order of the groups (the symmetric group first)
         std::vector<std::uint8_t> val8, out8, cnt4;
 };
 
@@ -186,10 +191,12 @@ constexpr std::array<std::array<int, 4>, 4> mdir{ { { 0, 1, 2, 3 }, { 0, 3, 2, 1
 std::array<int, N> qidx{};                       // index of a square in the quadrant, -1 outside
 std::vector<int> qsq;                            // the quadrant squares
 std::string lean_key;                            // -lean <key>: build this database in lean, symmetric form
+std::string bits_key;                            // -bits <key> / -check <key>: win/draw bits for red to move only
+bool check_bits = false;                         // -check: build <key> normally as well and compare every state
 
-inline void symmetrize(Pos& p)
+inline void symmetrize(Slice const& sl, Pos& p)
 {
-        auto const k = p.side[0].sq[0];                         // the unique highest red piece (sorted first)
+        auto const k = p.side[sl.gside[sl.symg]].sq[sl.gfirst[sl.symg]];        // the unique piece
         auto const t = (fo[k] >= W / 2 ? 1 : 0) | (ro[k] >= H / 2 ? 2 : 0);
         if (t == 0) { return; }
         for (auto& sd : p.side) {
@@ -205,7 +212,7 @@ std::uint64_t encode(Slice const& sl, Pos const& p)
 {
         if (!sl.sym) { return encode_raw(sl, p); }
         auto q = p;
-        symmetrize(q);
+        symmetrize(sl, q);
         return encode_raw(sl, q);
 }
 
@@ -214,14 +221,15 @@ std::uint64_t encode_raw(Slice const& sl, Pos const& p)
         std::array<int, 4> used{};
         auto nu = 0;
         std::uint64_t idx = 0;
-        for (auto g = 0; g < sl.ng; ++g) {
+        for (auto gi = 0; gi < sl.ng; ++gi) {
+                auto const g = sl.gord[gi];
                 auto const& s = p.side[sl.gside[g]];
                 std::array<int, 2> c{};
                 for (auto k = 0; k < sl.gcount[g]; ++k) {
                         auto const x = s.sq[sl.gfirst[g] + k];
                         auto below = 0;
                         for (auto u = 0; u < nu; ++u) { below += used[u] < x; }
-                        c[k] = (g == 0 && sl.sym) ? qidx[x] : x - below;
+                        c[k] = (g == sl.symg && sl.sym) ? qidx[x] : x - below;
                 }
                 for (auto k = 0; k < sl.gcount[g]; ++k) { used[nu++] = s.sq[sl.gfirst[g] + k]; }
                 idx = idx * sl.radix[g] + (sl.gcount[g] == 1 ? std::uint64_t(c[0]) : prank(c[0], c[1]));
@@ -240,17 +248,18 @@ Pos decode(Slice const& sl, std::uint64_t idx, int stm)
         auto const bsi = static_cast<int>(idx % sl.bs); idx /= sl.bs;
         auto const wsi = static_cast<int>(idx % sl.ws); idx /= sl.ws;
         std::array<std::uint64_t, 4> digit{};
-        for (auto g = sl.ng - 1; g >= 0; --g) { digit[g] = idx % sl.radix[g]; idx /= sl.radix[g]; }
+        for (auto gi = sl.ng - 1; gi >= 0; --gi) { auto const g = sl.gord[gi]; digit[g] = idx % sl.radix[g]; idx /= sl.radix[g]; }
         std::array<int, 4> used{};
         auto nu = 0;
         for (auto s = 0; s < 2; ++s) { p.side[s].n = sl.n[s]; for (auto k = 0; k < sl.n[s]; ++k) { p.side[s].rk[k] = sl.rk[s][k]; } }
-        for (auto g = 0; g < sl.ng; ++g) {
+        for (auto gi = 0; gi < sl.ng; ++gi) {
+                auto const g = sl.gord[gi];
                 std::array<int, 2> c{};
                 if (sl.gcount[g] == 1) { c[0] = int(digit[g]); } else { c = { pairs[digit[g]].first, pairs[digit[g]].second }; }
                 std::array<int, 2> placed{};
                 for (auto k = 0; k < sl.gcount[g]; ++k) {
                         auto x = c[k];
-                        if (g == 0 && sl.sym) { placed[k] = qsq[x]; continue; }
+                        if (g == sl.symg && sl.sym) { placed[k] = qsq[x]; continue; }
                         std::array<int, 4> su = used;
                         std::sort(su.begin(), su.begin() + nu);
                         for (auto u = 0; u < nu; ++u) { if (su[u] <= x) { ++x; } }
@@ -479,6 +488,27 @@ void pv(Pos p)
                 p = next;
         }
         std::cout << '\n';
+}
+
+// Symmetric index: the first unique piece (red first) is mirrored into a1-e5 and indexed first.
+void make_sym(Slice& sl)
+{
+        sl.sym = true;
+        sl.symg = -1;
+        for (auto g = 0; g < sl.ng; ++g) { if (sl.gcount[g] == 1) { sl.symg = g; break; } }
+        if (sl.symg < 0) { throw std::invalid_argument("symmetric build needs a unique piece"); }
+        if (sl.lean && (sl.symg != 0 || sl.gside[0] != 0)) { throw std::invalid_argument("-lean needs a unique highest red piece"); }
+        auto gi = 0;
+        sl.gord[gi++] = sl.symg;
+        for (auto g = 0; g < sl.ng; ++g) { if (g != sl.symg) { sl.gord[gi++] = g; } }
+        sl.place = 1;
+        auto left = N;
+        for (auto k = 0; k < sl.ng; ++k) {
+                auto const g = sl.gord[k];
+                sl.radix[g] = g == sl.symg ? qsq.size() : binom(left, sl.gcount[g]);
+                sl.place *= sl.radix[g];
+                left -= sl.gcount[g];
+        }
 }
 
 // Atomic bitset over 64-bit words, for the frontier sets of the lean build.
@@ -726,6 +756,244 @@ void build_lean(Slice& sl, std::string const& key, std::chrono::steady_clock::ti
         std::cout << std::flush;
 }
 
+// -bits / -check: win/draw for red to move only, as bits, for a database in which only red can win, plus the distance
+// to mate of the red-to-move states in which red is not restricted (enough to get blue to move with one ply for every
+// state in which red is not restricted). Leapfrog by plies; a red win by a capture is provisional (T) until its level.
+struct BitsDb
+{
+        Slice sl;
+        Bits W;                                 // red to move wins
+        std::vector<std::uint8_t> dtm;          // red to move, red not restricted: (n + 1) / 2 for a win in n plies, 0 otherwise
+        bool red_free(std::uint64_t i) const { return (i / sl.bs) % sl.ws == 0; }
+        std::uint64_t dtm_index(std::uint64_t i) const { return (i / (sl.ws * sl.bs)) * sl.bs + i % sl.bs; }
+};
+
+// blue to move, by one ply over red-to-move bits: {lost, distance or -1 if not stored}
+std::pair<bool, int> blue_value(BitsDb& db, Pos const& p)
+{
+        auto lost = true;
+        auto L = 0;
+        auto const n = for_each_move(p, [&](Pos const& c, bool in, auto&&...) {
+                if (!lost) { return; }
+                if (in) {
+                        auto const j = encode(db.sl, c);
+                        if (!db.W.test(j)) { lost = false; return; }
+                        if (L >= 0) { L = db.red_free(j) ? std::max(L, 2 * db.dtm[db.dtm_index(j)] - 1 + 1) : -1; }
+                } else {
+                        auto const v = child_value(c);
+                        if (v >= DRAW) { lost = false; return; }
+                        if (!(v & 1)) { throw std::runtime_error("bits: blue can win in this database"); }
+                        if (L >= 0) { L = std::max(L, int(v) + 1); }
+                }
+        });
+        if (n == 0) { auto const t = terminal(p); return { t == 0, t == 0 ? 0 : -1 }; }
+        return { lost, lost ? L : -1 };
+}
+
+BitsDb build_bits(Slice const& base, std::string const& key)
+{
+        using clock = std::chrono::steady_clock;
+        auto const t0 = clock::now();
+        auto const elapsed = [&] { return std::chrono::duration<double>(clock::now() - t0).count(); };
+        BitsDb db;
+        auto& sl = db.sl;
+        sl.rk = base.rk; sl.n = base.n; sl.ng = base.ng; sl.gside = base.gside; sl.gcount = base.gcount; sl.gfirst = base.gfirst;
+        make_sym(sl);
+        sl.ws = base.ws; sl.bs = base.bs;
+        sl.size = sl.place * sl.ws * sl.bs;
+        auto const size = sl.size;
+        db.W.assign(size);
+        db.dtm.assign(sl.place * sl.bs, 0);
+        if (load) {             // -load: read the bits and distances written by an earlier run
+                auto const stem = std::format("dump/k{}_{}", unlimited() ? std::string("inf") : std::to_string(K), key);
+                auto f = std::fopen((stem + ".wdl").c_str(), "rb");
+                auto g = std::fopen((stem + ".dtm").c_str(), "rb");
+                auto ok = f && g && std::fread(db.W.w.data(), 8, db.W.w.size(), f) == db.W.w.size() && std::fread(db.dtm.data(), 1, db.dtm.size(), g) == db.dtm.size();
+                if (f) { std::fclose(f); }
+                if (g) { std::fclose(g); }
+                if (ok) { std::cout << std::format("{:6} bits geladen uit {}.wdl/.dtm\n", key, stem); return db; }
+        }
+        Bits F, G, T;
+        F.assign(size); G.assign(size); T.assign(size);
+        std::vector<std::vector<std::uint64_t>> pending(506);
+        auto const record = [&](std::uint64_t i, int v) { if (db.red_free(i)) { db.dtm[db.dtm_index(i)] = static_cast<std::uint8_t>((v + 1) / 2); } };
+        auto const red_capture_win = [&](Pos const& p) {
+                auto best = UNKNOWN;
+                for_each_move(p, [&](Pos const& c, bool in, auto&&...) {
+                        if (in) { return; }
+                        auto const v = backup(child_value(c));
+                        if (best == UNKNOWN || pref(v) > pref(best)) { best = v; }
+                });
+                return best < DRAW && (best & 1) ? int(best) : -1;
+        };
+
+        // initialisation: provisional red capture wins (T), blue losses that need no move inside the database
+#pragma omp parallel
+        {
+                std::vector<std::vector<std::uint64_t>> local(506);
+#pragma omp for schedule(dynamic, 1 << 14)
+                for (std::int64_t ii = 0; ii < static_cast<std::int64_t>(size); ++ii) {
+                        auto const i = static_cast<std::uint64_t>(ii);
+                        auto const r = decode(sl, i, 0);
+                        if (!valid(r)) { continue; }
+                        if (red_capture_win(r) > 0) { T.set(i); }
+                        auto const b = decode(sl, i, 1);
+                        auto inside = 0;
+                        auto ok = true;
+                        auto L = 0;
+                        auto const n = for_each_move(b, [&](Pos const& c, bool in, auto&&...) {
+                                if (in) { ++inside; return; }
+                                auto const v = child_value(c);
+                                if (v >= DRAW) { ok = false; return; }
+                                if (!(v & 1)) { throw std::runtime_error("bits: blue can win in this database"); }
+                                L = std::max(L, int(v) + 1);
+                        });
+                        if (n == 0) { if (terminal(b) == 0) { local[0].push_back(i); } continue; }
+                        if (inside == 0 && ok) { local[L].push_back(i); }
+                }
+#pragma omp critical
+                for (auto l = 0; l < 506; ++l) { pending[l].insert(pending[l].end(), local[l].begin(), local[l].end()); }
+        }
+        // the value of every provisional win, by rank among the T bits (prefix counts per 8 words)
+        std::vector<std::uint64_t> trank(T.w.size() / 8 + 2, 0);
+        for (auto k = 0uz; k < T.w.size(); ++k) { trank[k / 8 + 1] += std::uint64_t(std::popcount(T.w[k])); }
+        for (auto k = 1uz; k < trank.size(); ++k) { trank[k] += trank[k - 1]; }
+        auto const rank = [&](std::uint64_t i) {
+                auto const k = i >> 6;
+                auto r = trank[k / 8];
+                for (auto m = (k / 8) * 8; m < k; ++m) { r += std::uint64_t(std::popcount(T.w[m])); }
+                return r + std::uint64_t(std::popcount(T.w[k] & ((std::uint64_t{1} << (i & 63)) - 1)));
+        };
+        std::vector<std::uint8_t> tval(trank.back());
+        T.for_each([&](std::uint64_t i) { tval[rank(i)] = static_cast<std::uint8_t>((red_capture_win(decode(sl, i, 0)) + 1) / 2); });
+        auto const tmax = tval.empty() ? 0 : 2 * int(*std::ranges::max_element(tval)) - 1;      // longest provisional win
+        std::cout << std::format("{:6} bits: initialisatie klaar na {:.0f}s, {} voorlopige slagwinsten\n", key, elapsed(), tval.size()) << std::flush;
+
+        for (auto i : pending[0]) { F.set(i); }
+        auto pend_max = 0;
+        for (auto l = 0; l < 506; ++l) { if (!pending[l].empty()) { pend_max = l; } }
+        auto frontier = pending[0].size();
+        for (auto lv = 0; lv + 2 <= 504; lv += 2) {
+                if (frontier == 0 && lv > pend_max && lv + 1 > tmax) { break; }        // nothing can change any more
+                auto const win = lv + 1;
+                // 1. blue losses at lv: their red parents win at lv + 1 (also before a slower capture win)
+                F.for_each([&](std::uint64_t i) {
+                        for_each_parent(sl, decode(sl, i, 1), 0, [&](std::uint64_t pi) {
+                                auto const old = std::atomic_ref<std::uint64_t>(db.W.w[pi >> 6]).fetch_or(std::uint64_t{1} << (pi & 63));
+                                if (!((old >> (pi & 63)) & 1)) { G.set(pi); record(pi, win); }
+                        });
+                });
+                F.clear();
+                // 2. provisional capture wins of exactly lv + 1 that nothing faster replaced
+                T.for_each([&](std::uint64_t i) {
+                        if (tval[rank(i)] != (win + 1) / 2) { return; }
+                        auto const old = std::atomic_ref<std::uint64_t>(db.W.w[i >> 6]).fetch_or(std::uint64_t{1} << (i & 63));
+                        if (!((old >> (i & 63)) & 1)) { G.set(i); record(i, win); }
+                });
+                // 3. red wins at lv + 1: their blue parents become candidates (in F)
+                G.for_each([&](std::uint64_t i) { for_each_parent(sl, decode(sl, i, 0), 1, [&](std::uint64_t pi) { F.set(pi); }); });
+                G.clear();
+                // 4. every candidate once: all its moves must lead to final red wins
+                std::vector<std::pair<int, std::uint64_t>> later;
+                frontier = 0;
+                F.for_each([&](std::uint64_t i) {
+                        auto const p = decode(sl, i, 1);
+                        auto ok = true;
+                        auto L = lv + 2;
+                        for_each_move(p, [&](Pos const& c, bool in, auto&&...) {
+                                if (!ok) { return; }
+                                if (in) { if (!db.W.test(encode(sl, c))) { ok = false; } return; }
+                                auto const v = child_value(c);
+                                if (v >= DRAW) { ok = false; return; }
+                                if (!(v & 1)) { throw std::runtime_error("bits: blue can win in this database"); }
+                                L = std::max(L, int(v) + 1);
+                        });
+                        if (!ok) { return; }
+                        if (L == lv + 2) {
+                                G.set(i);
+#pragma omp atomic
+                                ++frontier;
+                        } else {
+#pragma omp critical
+                                later.push_back({ L, i });
+                        }
+                });
+                F.clear();
+                for (auto [L, i] : later) { pending[L].push_back(i); pend_max = std::max(pend_max, L); }
+                for (auto i : pending[lv + 2]) { G.set(i); }
+                frontier += pending[lv + 2].size();
+                std::swap(F, G);
+                if (lv % 50 == 48) { std::cout << std::format("{:6} bits: niveau {} na {:.0f}s\n", key, lv + 2, elapsed()) << std::flush; }
+        }
+        std::cout << std::format("{:6} bits: klaar na {:.0f}s\n", key, elapsed()) << std::flush;
+        auto const stem = std::format("dump/k{}_{}", unlimited() ? std::string("inf") : std::to_string(K), key);
+        if (auto f = std::fopen((stem + ".wdl").c_str(), "wb")) { std::fwrite(db.W.w.data(), 8, db.W.w.size(), f); std::fclose(f); }
+        if (auto f = std::fopen((stem + ".dtm").c_str(), "wb")) { std::fwrite(db.dtm.data(), 1, db.dtm.size(), f); std::fclose(f); }
+        return db;
+}
+
+std::unique_ptr<BitsDb> bits_db;        // the -bits database, for -pos
+
+// statistics of a bits database (red to move from the bits, blue to move by one ply)
+void report_bits(BitsDb& db, std::string const& key)
+{
+        auto& sl = db.sl;
+        std::array<std::array<std::uint64_t, 2>, 2> all{}, fresh{};     // [stm][win, total]
+        std::array<int, 2> lw{};
+        for (auto s = 0; s < 2; ++s) {
+                std::uint64_t a0 = 0, a1 = 0, f0 = 0, f1 = 0;
+                auto l = 0;
+#pragma omp parallel for schedule(dynamic, 1 << 14) reduction(+ : a0, a1, f0, f1) reduction(max : l)
+                for (std::int64_t ii = 0; ii < static_cast<std::int64_t>(sl.size); ++ii) {
+                        auto const i = static_cast<std::uint64_t>(ii);
+                        auto const p = decode(sl, i, s);
+                        if (!valid(p)) { continue; }
+                        auto const fr = i % (sl.ws * sl.bs) == 0;
+                        bool w;
+                        auto v = -1;
+                        if (s == 0) { w = db.W.test(i); if (w && db.red_free(i)) { v = 2 * db.dtm[db.dtm_index(i)] - 1; } }
+                        else { auto const [lost, L] = blue_value(db, p); w = lost; v = L; }
+                        ++a1; a0 += w;
+                        if (fr) { ++f1; f0 += w; if (w) { l = std::max(l, v); } }
+                }
+                all[s] = { a0, a1 }; fresh[s] = { f0, f1 }; lw[s] = l;
+        }
+        std::cout << std::format("{:6} {:11} toestanden per kant (symmetrisch, bits)\n", key, sl.size);
+        for (auto s = 0; s < 2; ++s) {
+                std::cout << std::format("       {} aan zet | alle toestanden: rood {:5.1f}% | niemand beperkt: rood {:5.1f}%, langste rode winst {} plies\n",
+                        s == 0 ? "rood " : "blauw", 100.0 * double(all[s][0]) / double(all[s][1]), 100.0 * double(fresh[s][0]) / double(fresh[s][1]), lw[s]);
+        }
+        std::cout << std::flush;
+}
+
+// -check: every state of the normal database against the bits database
+void check_bits_against(Slice const& sl, BitsDb& db, std::string const& key)
+{
+        std::uint64_t states = 0, wdl = 0, dist = 0, dists = 0;
+#pragma omp parallel for schedule(dynamic, 1 << 14) reduction(+ : states, wdl, dist, dists)
+        for (std::int64_t ii = 0; ii < static_cast<std::int64_t>(sl.size); ++ii) {
+                auto const i = static_cast<std::uint64_t>(ii);
+                for (auto s = 0; s < 2; ++s) {
+                        auto const v = sl.val[i * 2 + std::uint64_t(s)];
+                        if (v == INVALID) { continue; }
+                        ++states;
+                        auto const p = decode(sl, i, s);
+                        auto const redwin = v < DRAW && (bool(v & 1) == (s == 0));
+                        if (v < DRAW && !redwin) { ++wdl; continue; }            // a blue win: not representable
+                        if (s == 0) {
+                                auto const j = encode(db.sl, p);
+                                if (db.W.test(j) != redwin) { ++wdl; continue; }
+                                if (redwin && db.red_free(j)) { ++dists; dist += int(2 * db.dtm[db.dtm_index(j)] - 1) != int(v); }
+                        } else {
+                                auto const [lost, L] = blue_value(db, p);
+                                if (lost != redwin) { ++wdl; continue; }
+                                if (redwin && L >= 0) { ++dists; dist += L != int(v); }
+                        }
+                }
+        }
+        std::cout << std::format("{:6} check: {} toestanden, {} uitslagverschillen; {} afstanden vergeleken, {} verschillen\n", key, states, wdl, dists, dist) << std::flush;
+}
+
 void build(std::string const& red0, std::string const& blue0)
 {
         std::array<std::vector<int>, 2> rk;
@@ -759,20 +1027,17 @@ void build(std::string const& red0, std::string const& blue0)
                         auto j = k; while (j < v.size() && v[j] == v[k]) { ++j; }
                         sl.gside[sl.ng] = s; sl.gcount[sl.ng] = int(j - k); sl.gfirst[sl.ng] = int(k);
                         sl.radix[sl.ng] = binom(free, int(j - k));
-                        if (sl.ng == 0 && key == lean_key) {
-                                if (s != 0 || j - k != 1) { throw std::invalid_argument("-lean needs a unique highest red piece"); }
-                                sl.lean = sl.sym = true;
-                                sl.radix[0] = qsq.size();
-                        }
                         sl.place *= sl.radix[sl.ng]; free -= int(j - k);
                         ++sl.ng; k = j;
                 }
         }
+        if (key == lean_key) { sl.lean = true; make_sym(sl); }
         sl.ws = unlimited() ? 1 : 1 + 4 * std::uint64_t(K) * std::uint64_t(sl.n[0]);
         sl.bs = unlimited() ? 1 : 1 + 4 * std::uint64_t(K) * std::uint64_t(sl.n[1]);
         sl.size = sl.place * sl.ws * sl.bs;
         auto const size = sl.size;
         if (sl.lean) { build_lean(sl, key, t0); return; }
+        if (key == bits_key && !check_bits) { bits_db = std::make_unique<BitsDb>(build_bits(sl, key)); if (!load) { report_bits(*bits_db, key); } return; }
         sl.val.assign(2 * size, UNKNOWN);
         if (load) {
                 auto const base = std::format("dump/k{}_{}.db", unlimited() ? std::string("inf") : std::to_string(K), key);
@@ -989,13 +1254,14 @@ void build(std::string const& red0, std::string const& blue0)
                 write(fv, "bin");       // nobody restricted
                 write(sl.val, "db");    // the whole database, index * 2 + stm, see encode()
         }
-        if (lw[0]) {
+        if (lw[0] && key != bits_key) {
                 std::cout << std::format("\nlangste rode winst met rood aan zet in {}: {} plies\n", key, lw[0]);
                 auto const p = decode(sl, lwi[0], 0);
                 diagram(p);
                 pv(p);
                 std::cout << '\n';
         }
+        if (key == bits_key && check_bits) { auto db = build_bits(sl, key); report_bits(db, key); check_bits_against(sl, db, key); }
         std::cout << std::flush;
 }
 
@@ -1030,6 +1296,7 @@ int main(int argc, char* argv[])
         if (a < argc && std::string(argv[a]) == "-load") { load = true; ++a; }
         if (a < argc && std::string(argv[a]) == "-prefer") { prefer = true; ++a; }
         if (a + 1 < argc && std::string(argv[a]) == "-lean") { lean_key = argv[a + 1]; a += 2; }
+        if (a + 1 < argc && (std::string(argv[a]) == "-bits" || std::string(argv[a]) == "-check")) { check_bits = std::string(argv[a]) == "-check"; bits_key = argv[a + 1]; a += 2; }
         // -pos <red> <blue> <r|b>, e.g. -pos Le5,Se1 Lf2 r: diagram and main line (the databases must be built or loaded)
         std::array<std::string, 3> pos_arg{};
         auto have_pos = false;
@@ -1055,6 +1322,22 @@ int main(int argc, char* argv[])
                         p.side[s].normalise();
                 }
                 p.stm = pos_arg[2] == "r" ? 0 : 1;
+                if (bits_db) {
+                        auto q = p;
+                        auto const& t = canonicalise(q);
+                        if (t.key == bits_key) {
+                                if (q.stm == 0) {
+                                        auto const j = encode(bits_db->sl, q);
+                                        auto const w = bits_db->W.test(j);
+                                        std::cout << "\nwaarde voor de kant aan zet (bits): " << (!w ? std::string("remise") : bits_db->red_free(j) ? std::format("winst in {} plies", 2 * bits_db->dtm[bits_db->dtm_index(j)] - 1) : std::string("winst")) << "\n";
+                                } else {
+                                        auto const [lost, L] = blue_value(*bits_db, q);
+                                        std::cout << "\nwaarde voor de kant aan zet (bits): " << (!lost ? std::string("remise") : L >= 0 ? std::format("verlies in {} plies", L) : std::string("verlies")) << "\n";
+                                }
+                                diagram(p);
+                                return 0;
+                        }
+                }
                 auto const v = child_value(p);
                 std::cout << "\nwaarde voor de kant aan zet: " << (v >= DRAW ? std::string("remise") : std::format("{} in {} plies", (v & 1) ? "winst" : "verlies", int(v))) << "\n";
                 diagram(p);
