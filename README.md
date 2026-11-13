@@ -10,6 +10,7 @@ is a parameter, so the effect of the rule on results and lengths can be measured
 * [Longest wins with red to move](#longest-wins-with-red-to-move)
 * [The effect of the two-square limit](#the-effect-of-the-two-square-limit)
 * [L–S in closed form: opposition and the lake ring](#ls-in-closed-form-opposition-and-the-lake-ring)
+* [LS–L: the edge sergeant and the pendulum](#lsl-the-edge-sergeant-and-the-pendulum)
 * [L–SS: the corner curiosities](#lss-the-corner-curiosities)
 * [Four pieces without the rule: 2L–2S](#four-pieces-without-the-rule-2l2s)
 * [Reproducing everything](#reproducing-everything)
@@ -206,17 +207,17 @@ Longest win in plies (red wins % with red to move / with blue to move), for k = 
 | LS–L | 67 (14.7 / 7.4) | 51 (14.6 / 7.3) | 55 (14.6 / 7.3) | 59 (14.6 / 7.3) | 59 (14.6 / 7.3) | 47 (14.5 / 7.2) |
 | LS–S | 52 (100.0 / 100.0) | 52 (100.0 / 100.0) | 52 (100.0 / 100.0) | 52 (100.0 / 100.0) | 52 (100.0 / 100.0) | 52 (100.0 / 100.0) |
 
-Red to move, nobody restricted, **red cannot attack at once** (no red piece orthogonally next to a blue piece):
-longest red win (red wins %):
+Positions in which **nobody is restricted and nobody can attack at once** (no red piece orthogonally next to a
+blue piece): longest red win with red to move / blue to move (red wins % with red to move / blue to move):
 
 | database | k = 1 | k = 2 | k = 3 | k = 4 | k = 5 | ∞ |
 |---|---|---|---|---|---|---|
-| L–S | 61 (8.5%) | 29 (7.5%) | 29 (7.5%) | 29 (7.5%) | 29 (7.5%) | 29 (7.5%) |
-| L–SS | — (0.0%) | — (0.0%) | — (0.0%) | — (0.0%) | — (0.0%) | — (0.0%) |
-| LS–L | 67 (11.7%) | 49 (11.6%) | 53 (11.6%) | 57 (11.6%) | 57 (11.6%) | 47 (11.5%) |
-| SS–S | 51 (100.0%) | 51 (100.0%) | 51 (100.0%) | 51 (100.0%) | 51 (100.0%) | 51 (100.0%) |
-| LL–S | 51 (100.0%) | 51 (100.0%) | 51 (100.0%) | 51 (100.0%) | 51 (100.0%) | 51 (100.0%) |
-| LS–S | 51 (100.0%) | 51 (100.0%) | 51 (100.0%) | 51 (100.0%) | 51 (100.0%) | 51 (100.0%) |
+| L–S | 61 / 60 (8.5 / 6.0) | 29 / 28 (7.5 / 5.8) | 29 / 28 (7.5 / 5.8) | 29 / 28 (7.5 / 5.8) | 29 / 28 (7.5 / 5.8) | 29 / 28 (7.5 / 5.8) |
+| L–SS | — / — (0.0 / 0.0) | — / — (0.0 / 0.0) | — / — (0.0 / 0.0) | — / — (0.0 / 0.0) | — / — (0.0 / 0.0) | — / — (0.0 / 0.0) |
+| LS–L | 67 / 66 (11.7 / 7.0) | 49 / 48 (11.6 / 6.9) | 53 / 52 (11.6 / 6.9) | 57 / 56 (11.6 / 6.9) | 57 / 56 (11.6 / 6.9) | 47 / 46 (11.5 / 6.9) |
+| SS–S | 51 / 52 (100.0 / 100.0) | 51 / 52 (100.0 / 100.0) | 51 / 52 (100.0 / 100.0) | 51 / 52 (100.0 / 100.0) | 51 / 52 (100.0 / 100.0) | 51 / 52 (100.0 / 100.0) |
+| LL–S | 51 / 52 (100.0 / 100.0) | 51 / 52 (100.0 / 100.0) | 51 / 52 (100.0 / 100.0) | 51 / 52 (100.0 / 100.0) | 51 / 52 (100.0 / 100.0) | 51 / 52 (100.0 / 100.0) |
+| LS–S | 51 / 52 (100.0 / 100.0) | 51 / 52 (100.0 / 100.0) | 51 / 52 (100.0 / 100.0) | 51 / 52 (100.0 / 100.0) | 51 / 52 (100.0 / 100.0) | 51 / 52 (100.0 / 100.0) |
 
 Compared with ∞, on the states in which nobody is restricted: red wins that only exist with the rule (extra) and red
 wins that disappear with it (lost):
@@ -245,6 +246,8 @@ Observations:
 * For k ≥ 2 the rule only adds wins here. In LS–L that is a fixed set of 416 (red to move) and 352 (blue to move)
   states that are drawn without the rule because blue can oscillate forever, the same for every k ≥ 2. Their length
   grows with k up to k = 4 (longest 51, 55, 59, 59 for k = 2…5), after which the rule no longer binds.
+* In the quiet positions (nobody restricted, nobody can attack) L–SS is always a draw, for every k and either side to
+  move: all its wins come from an immediate capture or from a restricted sergeant.
 * For a first overall picture of an endgame, k = ∞ is the natural first run: the state space is smallest (LS–L:
   0.75 M states per side instead of 245 M for k = 3; the factor is (1 + 4k·n_red)(1 + 4k·n_blue)), and the verdicts
   differ only in the rule-dependent corner cases.
@@ -266,6 +269,47 @@ L arrives on the ring square right after S and captures it there. With a larger 
 lake with L at least two squares away, and a single pursuer never catches a piece that runs around a cycle (the cop
 number of a cycle is 2). Running around the lake never repeats two squares, so the rule is irrelevant for k ≥ 2.
 For k = 1 there are 80 (red to move) and 100 (blue to move) extra wins.
+
+## LS–L: the edge sergeant and the pendulum
+
+The 416 LS–L positions (red to move, nobody restricted) that are drawn without the rule and won with every k ≥ 2 have
+one theme: a red sergeant on the edge under perpetual attack. Example, red L e5, S e1, blue L f2, red to move:
+
+```
+    +---------------------+
+ 10 | . . . . . . . . . . |
+  9 | . . . . . . . . . . |
+  8 | . . . . . . . . . . |
+  7 | . . . . . . . . . . |
+  6 | . . ~ ~ . . ~ ~ . . |
+  5 | . . ~ ~ L . ~ ~ . . |
+  4 | . . . . . . . . . . |
+  3 | . . . . . . . . . . |
+  2 | . . . . . l . . . . |
+  1 | . . . . S . . . . . |
+    +---------------------+
+      a b c d e f g h i j
+```
+
+| k | 1 | 2 | 3 | 4 | 5 | ∞ |
+|---|---|---|---|---|---|---|
+| result | win 25 | win 29 | win 29 | win 33 | win 33 | draw |
+
+Main line for k = 3: 1. Le5-e4 Lf2-e2 2. Se1-f1 Le2-f2 3. Sf1-e1 Lf2-f1 4. Se1-e2 Lf1-f2 5. Se2-e3 Lf2-e2
+6. Se3-f3 Le2-f2 7. Sf3-f4 Lf2-f3 8. Sf4-f5 Lf3-g3 9. Le4-f4 Lg3-h3 10. Lf4-g4 Lh3-i3 11. Lg4-h4 Li3-j3
+12. Lh4-i4 Lj3-j2 13. Li4-i3 Lj2-j1 14. Li3-i2 Lj1-j2 15. Li2xj2 (exchange), and the lone sergeant wins.
+
+* **Without the rule**: with the blue lieutenant directly above it, the sergeant on the edge can only move sideways;
+  running along the edge ends in the corner, so it shuttles e1↔f1 while blue shuttles e2↔f2. Red has to move the
+  sergeant every move and never gets a tempo for the lieutenant: a perpetual attack, draw.
+* **With the rule, whoever started the pendulum has to stop first.** Blue starts it with the attacking move
+  1…Lf2-e2, half a move before red, so blue's count runs out first and blue has to give up the attack from above
+  (3…Lf2-f1). The sergeant escapes via e2-e3-f3-f4-f5 towards its own lieutenant, which then drives the blue
+  lieutenant into the corner with the opposition and forces the exchange.
+* The lengths step by 4 plies per two units of k (29, 29, 33, 33): both pendulums get longer with k. It is tempo
+  counting as in a draughts fortress, but here the rule is the clock, not the board.
+
+Reproduce with `./build/stratego_egdb -k 3 -load L LS -pos Le5,Se1 Lf2 r` after a run with `-k 3`.
 
 ## L–SS: the corner curiosities
 
@@ -305,6 +349,7 @@ python3 scripts/table.py results/k1.log results/k2.log results/k3.log results/k4
 python3 scripts/no_capture.py dump 1 2 3 4 5 inf
 python3 scripts/compare.py dump 1 2 3 4 5
 python3 scripts/ls_criterion.py dump inf 1 2 3 4 5
+./build/stratego_egdb -k 3 -load L LS -pos Le5,Se1 Lf2 r   # one position from the stored databases
 ./build/stratego22 > results/stratego22.log
 ```
 
