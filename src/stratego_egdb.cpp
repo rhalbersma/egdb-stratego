@@ -598,6 +598,9 @@ void build(std::string const& red0, std::string const& blue0)
 
         // statistics over valid states, and over states in which nobody is restricted
         std::array<std::array<std::uint64_t, 3>, 2> all{}, fresh{};
+        // states in which nobody is restricted, split by parity: the side to move "has the opposition" when the sum of
+        // file + rank over all pieces is odd (1 vs 1: red to move at odd distance, or blue to move at even distance)
+        std::array<std::array<std::array<std::uint64_t, 3>, 2>, 2> par{};     // [side to move][opposition][result]
         std::array<int, 2> lw{};
         std::array<std::uint64_t, 2> lwi{};
         for (auto s = 0; s < 2; ++s) {
@@ -608,6 +611,10 @@ void build(std::string const& red0, std::string const& blue0)
                         ++all[s][k];
                         if (i % (sl.ws * sl.bs) == 0) {
                                 ++fresh[s][k];
+                                auto const q = decode(sl, i, s);
+                                auto sum = 0;
+                                for (auto const& sd : q.side) { for (auto j = 0; j < sd.n; ++j) { sum += fo[sd.sq[j]] + ro[sd.sq[j]]; } }
+                                ++par[s][sum & 1][k];
                                 if (k == 0 && v > lw[s]) { lw[s] = v; lwi[s] = i; }
                         }
                 }
@@ -620,6 +627,11 @@ void build(std::string const& red0, std::string const& blue0)
                         s == 0 ? "rood " : "blauw", pct(all, 0), pct(all, 1), pct(all, 2), pct(fresh, 0), pct(fresh, 1), pct(fresh, 2));
                 if (lw[s]) { std::cout << std::format("  langste rode winst {} plies: {}", lw[s], describe(decode(sl, lwi[s], s))); }
                 std::cout << '\n';
+        }
+        for (auto s = 0; s < 2; ++s) {
+                auto const pct = [&](int o, int k) { auto const t = double(par[s][o][0] + par[s][o][1] + par[s][o][2]); return t > 0 ? 100.0 * double(par[s][o][k]) / t : 0.0; };
+                std::cout << std::format("       {} aan zet, niemand beperkt | met oppositie: rood {:5.1f}% remise {:5.1f}% blauw {:5.1f}% | zonder oppositie: rood {:5.1f}% remise {:5.1f}% blauw {:5.1f}%\n",
+                        s == 0 ? "rood " : "blauw", pct(1, 0), pct(1, 1), pct(1, 2), pct(0, 0), pct(0, 1), pct(0, 2));
         }
         {       // values of the states in which nobody is restricted: placement-major, side to move minor
                 std::vector<value_t> fv(2 * sl.place);

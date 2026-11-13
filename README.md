@@ -355,6 +355,29 @@ opposition. Red avoids that exchange and wins the sergeant in 97% of the positio
 up to 326 plies. KS–LL is a draw except for an immediate capture of a lieutenant (into KS–L); LL–SS is the enclosing
 method twice. The longest win in KL–LS starts from red K a1, L g1 vs blue L f1, S f9, red to move (325 plies).
 
+Split by opposition (states in which nobody is restricted). The side to move **has the opposition** when the sum of
+file + rank over all pieces is odd; for one piece each this is the L–S rule (red to move at odd distance, blue to move
+at even distance). Cells: red wins / draw / blue wins in %:
+
+| Canonical | Red to move, with opposition | Red to move, without | Blue to move, with opposition | Blue to move, without |
+|---|---|---|---|---|
+| SS–SS | 0 / 100 / 0 | 0 / 100 / 0 | 0 / 100 / 0 | 0 / 100 / 0 |
+| LL–SS | 100 / 0 / 0 | 100 / 0 / 0 | 100 / 0 / 0 | 100 / 0 / 0 |
+| LS–SS | 16.5 / 83.5 / 0 | 7.9 / 92.1 / 0 | 0.3 / 99.7 / 0 | 6.0 / 94.0 / 0 |
+| LL–LS | 39.6 / 60.4 / 0 | 14.7 / 85.3 / 0 | 5.5 / 94.5 / 0 | 27.0 / 73.0 / 0 |
+| LS–LS | 0.3 / 99.7 / 0 | 0.3 / 99.7 / 0 | 0 / 99.7 / 0.3 | 0 / 99.7 / 0.3 |
+| KS–LL | 0.6 / 99.4 / 0 | 0.6 / 99.4 / 0 | 0 / 100 / 0 | 0 / 100 / 0 |
+| KS–LS | 5.6 / 94.4 / 0 | 4.1 / 95.9 / 0 | 0 / 100 / 0 | 0.8 / 99.2 / 0 |
+| KL–LS | 97.7 / 2.3 / 0 | 96.7 / 3.3 / 0 | 90.9 / 9.1 / 0 | 93.1 / 6.9 / 0 |
+| KL–KS | 2.1 / 97.9 / 0 | 0.5 / 99.5 / 0 | 0 / 99.7 / 0.3 | 0.6 / 99.1 / 0.3 |
+| ML–KS | 5.6 / 94.4 / 0 | 4.3 / 95.7 / 0 | 0 / 100 / 0 | 0.8 / 99.2 / 0 |
+
+A reciprocal zugzwang in KL–LS: red L a1, K i9 vs blue L b2, S j10. Red to move draws, blue to move loses in 86
+plies. The sergeant in the corner cannot move (j9 and i10 are next to the captain) and the lieutenants block each
+other diagonally: a lieutenant that moves allows the exchange. Blue to move must give up b2 or the sergeant. Red to
+move must release the sergeant or allow the exchange into K–S with the wrong parity. Check it with
+`./build/stratego_egdb -k inf -load KL LS -pos La1,Ki9 Lb2,Sj10 r` (and `b`).
+
 ## Spy and marshal
 
 The spy E wins when it attacks the marshal X; every piece that attacks the spy wins; E vs E is an exchange. When a
