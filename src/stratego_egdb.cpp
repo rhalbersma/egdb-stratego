@@ -927,8 +927,16 @@ BitsDb build_bits(Slice const& base, std::string const& key)
         }
         std::cout << std::format("{:6} bits: klaar na {:.0f}s\n", key, elapsed()) << std::flush;
         auto const stem = std::format("dump/k{}_{}", unlimited() ? std::string("inf") : std::to_string(K), key);
-        if (auto f = std::fopen((stem + ".wdl").c_str(), "wb")) { std::fwrite(db.W.w.data(), 8, db.W.w.size(), f); std::fclose(f); }
-        if (auto f = std::fopen((stem + ".dtm").c_str(), "wb")) { std::fwrite(db.dtm.data(), 1, db.dtm.size(), f); std::fclose(f); }
+        auto written = false;
+        if (auto f = std::fopen((stem + ".wdl").c_str(), "wb")) {
+                written = std::fwrite(db.W.w.data(), 8, db.W.w.size(), f) == db.W.w.size();
+                written = std::fclose(f) == 0 && written;
+        }
+        if (auto f = std::fopen((stem + ".dtm").c_str(), "wb")) {
+                written = std::fwrite(db.dtm.data(), 1, db.dtm.size(), f) == db.dtm.size() && written;
+                written = std::fclose(f) == 0 && written;
+        }
+        std::cout << std::format("{:6} bits: {}\n", key, written ? "weggeschreven naar " + stem + ".wdl/.dtm" : "WEGSCHRIJVEN MISLUKT (schijf vol?)") << std::flush;
         return db;
 }
 
