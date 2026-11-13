@@ -1,0 +1,149 @@
+tweeveldenregel: max 1 zetten achter elkaar tussen twee velden
+
+L-S         209300 toestanden per kant,   0.0s, langste  65 plies, verify OK
+       rood  aan zet | alle toestanden: rood  11.5% remise  88.5% blauw   0.0% | niemand beperkt: rood  11.9% remise  88.1% blauw   0.0%  langste rode winst 61 plies: rood La5, blauw Sa1
+       blauw aan zet | alle toestanden: rood   5.5% remise  94.5% blauw   0.0% | niemand beperkt: rood   6.7% remise  93.3% blauw   0.0%  langste rode winst 60 plies: rood La4, blauw Sa1
+       rood  aan zet, niemand beperkt | met oppositie: rood  21.7% remise  78.3% blauw   0.0% | zonder oppositie: rood   1.9% remise  98.1% blauw   0.0%
+       blauw aan zet, niemand beperkt | met oppositie: rood   2.4% remise  97.6% blauw   0.0% | zonder oppositie: rood  11.2% remise  88.8% blauw   0.0%
+
+langste rode winst met rood aan zet in L-S: 61 plies
+    +---------------------+
+ 10 | . . . . . . . . . . |
+  9 | . . . . . . . . . . |
+  8 | . . . . . . . . . . |
+  7 | . . . . . . . . . . |
+  6 | . . ~ ~ . . ~ ~ . . |
+  5 | L . ~ ~ . . ~ ~ . . |
+  4 | . . . . . . . . . . |
+  3 | . . . . . . . . . . |
+  2 | . . . . . . . . . . |
+  1 | s . . . . . . . . . |
+    +---------------------+
+      a b c d e f g h i j      (hoofdletters rood, kleine letters blauw)
+PV: 1. La5-a4 Sa1-b1 2. La4-b4 Sb1-c1 3. Lb4-c4 Sc1-d1 4. Lc4-d4 Sd1-e1 5. Ld4-e4 Se1-f1 6. Le4-f4 Sf1-g1 7. Lf4-g4 Sg1-h1 8. Lg4-h4 Sh1-i1 9. Lh4-i4 Si1-j1 10. Li4-j4 Sj1-j2 11. Lj4-j3 Sj2-i2 12. Lj3-i3 Si2-h2 13. Li3-h3 Sh2-g2 14. Lh3-g3 Sg2-f2 15. Lg3-f3 Sf2-e2 16. Lf3-e3 Se2-d2 17. Le3-d3 Sd2-c2 18. Ld3-c3 Sc2-b2 19. Lc3-b3 Sb2-a2 20. Lb3-a3 Sa2-a1 21. La3-a2 Sa1-b1 22. La2-b2 Sb1-c1 23. Lb2-c2 Sc1-d1 24. Lc2-d2 Sd1-e1 25. Ld2-e2 Se1-f1 26. Le2-f2 Sf1-g1 27. Lf2-g2 Sg1-h1 28. Lg2-h2 Sh1-i1 29. Lh2-i2 Si1-j1 30. Li2-j2 Sj1xj2(sneuvelt)
+
+S-S         209300 toestanden per kant,   0.0s, langste   0 plies, verify OK
+       rood  aan zet | alle toestanden: rood   0.0% remise 100.0% blauw   0.0% | niemand beperkt: rood   0.0% remise 100.0% blauw   0.0%
+       blauw aan zet | alle toestanden: rood   0.0% remise 100.0% blauw   0.0% | niemand beperkt: rood   0.0% remise 100.0% blauw   0.0%
+       rood  aan zet, niemand beperkt | met oppositie: rood   0.0% remise 100.0% blauw   0.0% | zonder oppositie: rood   0.0% remise 100.0% blauw   0.0%
+       blauw aan zet, niemand beperkt | met oppositie: rood   0.0% remise 100.0% blauw   0.0% | zonder oppositie: rood   0.0% remise 100.0% blauw   0.0%
+LS-L      33906600 toestanden per kant,   5.7s, langste  67 plies, verify OK
+       rood  aan zet | alle toestanden: rood  15.0% remise  85.0% blauw   0.0% | niemand beperkt: rood  14.7% remise  85.3% blauw   0.0%  langste rode winst 67 plies: rood Lb3 Sj9, blauw La10
+       blauw aan zet | alle toestanden: rood   7.5% remise  92.5% blauw   0.0% | niemand beperkt: rood   7.4% remise  92.6% blauw   0.0%  langste rode winst 66 plies: rood Lb4 Sj9, blauw La10
+       rood  aan zet, niemand beperkt | met oppositie: rood  14.7% remise  85.3% blauw   0.0% | zonder oppositie: rood  14.7% remise  85.3% blauw   0.0%
+       blauw aan zet, niemand beperkt | met oppositie: rood   7.4% remise  92.6% blauw   0.0% | zonder oppositie: rood   7.4% remise  92.6% blauw   0.0%
+
+langste rode winst met rood aan zet in LS-L: 67 plies
+    +---------------------+
+ 10 | l . . . . . . . . . |
+  9 | . . . . . . . . . S |
+  8 | . . . . . . . . . . |
+  7 | . . . . . . . . . . |
+  6 | . . ~ ~ . . ~ ~ . . |
+  5 | . . ~ ~ . . ~ ~ . . |
+  4 | . . . . . . . . . . |
+  3 | . L . . . . . . . . |
+  2 | . . . . . . . . . . |
+  1 | . . . . . . . . . . |
+    +---------------------+
+      a b c d e f g h i j      (hoofdletters rood, kleine letters blauw)
+PV: 1. Lb3-b4 La10-a9 2. Sj9-j10 La9-b9 3. Lb4-b5 Lb9-b10 4. Sj10-j9 Lb10-c10 5. Lb5-b6 Lc10-c9 6. Sj9-j10 Lc9-d9 7. Lb6-b7 Ld9-d10 8. Sj10-j9 Ld10-e10 9. Lb7-c7 Le10-e9 10. Sj9-j10 Le9-f9 11. Lc7-d7 Lf9-f10 12. Sj10-j9 Lf10-g10 13. Ld7-e7 Lg10-g9 14. Sj9-j10 Lg9-h9 15. Le7-f7 Lh9-h10 16. Sj10-j9 Lh10-i10 17. Lf7-g7 Li10-i9 18. Sj9-j10 Li9-j9 19. Sj10-i10 Lj9-j10 20. Si10-i9 Lj10-i10 21. Si9-h9 Li10-h10 22. Sh9-h8 Lh10-h9 23. Sh8-g8 Lh9-g9 24. Sg8-f8 Lg9-f9 25. Sf8-f7 Lf9-f10 26. Lg7-g8 Lf10-e10 27. Lg8-f8 Le10-e9 28. Sf7-g7 Le9-d9 29. Lf8-e8 Ld9-d10 30. Le8-e9 Ld10-c10 31. Le9-d9 Lc10-b10 32. Ld9-c9 Lb10-a10 33. Lc9-b9 La10-a9 34. Lb9xa9(ruil)
+
+L-SS      16953300 toestanden per kant,   2.0s, langste  65 plies, verify OK
+       rood  aan zet | alle toestanden: rood   0.3% remise  99.7% blauw   0.0% | niemand beperkt: rood   0.3% remise  99.7% blauw   0.0%  langste rode winst 61 plies: rood La5, blauw Sa1 Sa4
+       blauw aan zet | alle toestanden: rood   0.0% remise 100.0% blauw   0.0% | niemand beperkt: rood   0.0% remise 100.0% blauw   0.0%
+       rood  aan zet, niemand beperkt | met oppositie: rood   0.3% remise  99.7% blauw   0.0% | zonder oppositie: rood   0.3% remise  99.7% blauw   0.0%
+       blauw aan zet, niemand beperkt | met oppositie: rood   0.0% remise 100.0% blauw   0.0% | zonder oppositie: rood   0.0% remise 100.0% blauw   0.0%
+
+langste rode winst met rood aan zet in L-SS: 61 plies
+    +---------------------+
+ 10 | . . . . . . . . . . |
+  9 | . . . . . . . . . . |
+  8 | . . . . . . . . . . |
+  7 | . . . . . . . . . . |
+  6 | . . ~ ~ . . ~ ~ . . |
+  5 | L . ~ ~ . . ~ ~ . . |
+  4 | s . . . . . . . . . |
+  3 | . . . . . . . . . . |
+  2 | . . . . . . . . . . |
+  1 | s . . . . . . . . . |
+    +---------------------+
+      a b c d e f g h i j      (hoofdletters rood, kleine letters blauw)
+PV: 1. La5xa4 Sa1-b1 2. La4-b4 Sb1-c1 3. Lb4-c4 Sc1-d1 4. Lc4-d4 Sd1-e1 5. Ld4-e4 Se1-f1 6. Le4-f4 Sf1-g1 7. Lf4-g4 Sg1-h1 8. Lg4-h4 Sh1-i1 9. Lh4-i4 Si1-j1 10. Li4-j4 Sj1-j2 11. Lj4-j3 Sj2-i2 12. Lj3-i3 Si2-h2 13. Li3-h3 Sh2-g2 14. Lh3-g3 Sg2-f2 15. Lg3-f3 Sf2-e2 16. Lf3-e3 Se2-d2 17. Le3-d3 Sd2-c2 18. Ld3-c3 Sc2-b2 19. Lc3-b3 Sb2-a2 20. Lb3-a3 Sa2-a1 21. La3-a2 Sa1-b1 22. La2-b2 Sb1-c1 23. Lb2-c2 Sc1-d1 24. Lc2-d2 Sd1-e1 25. Ld2-e2 Se1-f1 26. Le2-f2 Sf1-g1 27. Lf2-g2 Sg1-h1 28. Lg2-h2 Sh1-i1 29. Lh2-i2 Si1-j1 30. Li2-j2 Sj1xj2(sneuvelt)
+
+LL-S      16953300 toestanden per kant,   5.7s, langste  52 plies, verify OK
+       rood  aan zet | alle toestanden: rood 100.0% remise   0.0% blauw   0.0% | niemand beperkt: rood 100.0% remise   0.0% blauw   0.0%  langste rode winst 51 plies: rood La1 Lb1, blauw Sd1
+       blauw aan zet | alle toestanden: rood 100.0% remise   0.0% blauw   0.0% | niemand beperkt: rood 100.0% remise   0.0% blauw   0.0%  langste rode winst 52 plies: rood La1 Lb1, blauw Sc1
+       rood  aan zet, niemand beperkt | met oppositie: rood 100.0% remise   0.0% blauw   0.0% | zonder oppositie: rood 100.0% remise   0.0% blauw   0.0%
+       blauw aan zet, niemand beperkt | met oppositie: rood 100.0% remise   0.0% blauw   0.0% | zonder oppositie: rood 100.0% remise   0.0% blauw   0.0%
+
+langste rode winst met rood aan zet in LL-S: 51 plies
+    +---------------------+
+ 10 | . . . . . . . . . . |
+  9 | . . . . . . . . . . |
+  8 | . . . . . . . . . . |
+  7 | . . . . . . . . . . |
+  6 | . . ~ ~ . . ~ ~ . . |
+  5 | . . ~ ~ . . ~ ~ . . |
+  4 | . . . . . . . . . . |
+  3 | . . . . . . . . . . |
+  2 | . . . . . . . . . . |
+  1 | L L . s . . . . . . |
+    +---------------------+
+      a b c d e f g h i j      (hoofdletters rood, kleine letters blauw)
+PV: 1. La1-a2 Sd1-d2 2. Lb1-b2 Sd2-d3 3. La2-a3 Sd3-d4 4. Lb2-b3 Sd4-e4 5. La3-a4 Se4-e5 6. Lb3-c3 Se5-e6 7. Lc3-d3 Se6-e7 8. Ld3-e3 Se7-e8 9. Le3-f3 Se8-f8 10. Lf3-g3 Sf8-f9 11. La4-a5 Sf9-f10 12. La5-a6 Sf10-g10 13. Lg3-h3 Sg10-h10 14. La6-a7 Sh10-i10 15. La7-b7 Si10-j10 16. Lb7-c7 Sj10-j9 17. Lc7-d7 Sj9-j8 18. Ld7-e7 Sj8-j7 19. Le7-f7 Sj7-j6 20. Lf7-g7 Sj6-j5 21. Lh3-h4 Sj5-j4 22. Lh4-i4 Sj4-j3 23. Li4-i3 Sj3-j2 24. Li3-i2 Sj2-j1 25. Li2-i1 Sj1xi1(sneuvelt)
+
+LS-S      33906600 toestanden per kant,  14.3s, langste  52 plies, verify OK
+       rood  aan zet | alle toestanden: rood 100.0% remise   0.0% blauw   0.0% | niemand beperkt: rood 100.0% remise   0.0% blauw   0.0%  langste rode winst 51 plies: rood La1 Sb1, blauw Sd1
+       blauw aan zet | alle toestanden: rood 100.0% remise   0.0% blauw   0.0% | niemand beperkt: rood 100.0% remise   0.0% blauw   0.0%  langste rode winst 52 plies: rood La1 Sb1, blauw Sc1
+       rood  aan zet, niemand beperkt | met oppositie: rood 100.0% remise   0.0% blauw   0.0% | zonder oppositie: rood 100.0% remise   0.0% blauw   0.0%
+       blauw aan zet, niemand beperkt | met oppositie: rood 100.0% remise   0.0% blauw   0.0% | zonder oppositie: rood 100.0% remise   0.0% blauw   0.0%
+
+langste rode winst met rood aan zet in LS-S: 51 plies
+    +---------------------+
+ 10 | . . . . . . . . . . |
+  9 | . . . . . . . . . . |
+  8 | . . . . . . . . . . |
+  7 | . . . . . . . . . . |
+  6 | . . ~ ~ . . ~ ~ . . |
+  5 | . . ~ ~ . . ~ ~ . . |
+  4 | . . . . . . . . . . |
+  3 | . . . . . . . . . . |
+  2 | . . . . . . . . . . |
+  1 | L S . s . . . . . . |
+    +---------------------+
+      a b c d e f g h i j      (hoofdletters rood, kleine letters blauw)
+PV: 1. La1-a2 Sd1-d2 2. La2-a3 Sd2-d3 3. La3-a4 Sd3-d4 4. La4-a5 Sd4-e4 5. La5-a6 Se4-e5 6. La6-a7 Se5-e6 7. La7-b7 Se6-e7 8. Lb7-c7 Se7-f7 9. Lc7-d7 Sf7-g7 10. Ld7-e7 Sg7-h7 11. Le7-f7 Sh7-i7 12. Lf7-g7 Si7-i6 13. Lg7-h7 Si6-i5 14. Sb1-b2 Si5-j5 15. Lh7-i7 Sj5-j4 16. Sb2-b3 Sj4-j3 17. Li7-j7 Sj3-j2 18. Sb3-c3 Sj2-j1 19. Sc3-d3 Sj1-i1 20. Sd3-e3 Si1-i2 21. Se3-f3 Si2-i3 22. Sf3-g3 Si3-i4 23. Sg3-h3 Si4-j4 24. Sh3-i3 Sj4-j5 25. Si3-i4 Sj5-j6 26. Lj7xj6
+
+KL-LS  initialisatie klaar na 73s
+KL-LS  niveau 50 na 113s
+KL-LS  niveau 100 na 200s
+KL-LS  niveau 150 na 267s
+KL-LS  niveau 200 na 288s
+KL-LS  niveau 250 na 307s
+KL-LS  niveau 300 na 329s
+KL-LS  niveau 350 na 351s
+KL-LS  niveau 400 na 372s
+KL-LS  niveau 450 na 392s
+KL-LS  niveau 500 na 413s
+KL-LS   1357959330 toestanden per kant (symmetrisch, lean), 617.8s, langste 202 plies, verify OK
+       rood  aan zet | alle toestanden: rood  99.5% remise   0.5% blauw   0.0% | niemand beperkt: rood  99.4% remise   0.6% blauw   0.0%  langste rode winst 199 plies: rood Ka1 Le10, blauw Lf10 Sj9
+       blauw aan zet | alle toestanden: rood  96.3% remise   3.7% blauw   0.0% | niemand beperkt: rood  96.2% remise   3.8% blauw   0.0%  langste rode winst 200 plies: rood Ka1 Le10, blauw Lg10 Sj9
+
+langste rode winst met rood aan zet in KL-LS: 199 plies
+    +---------------------+
+ 10 | . . . . L l . . . . |
+  9 | . . . . . . . . . s |
+  8 | . . . . . . . . . . |
+  7 | . . . . . . . . . . |
+  6 | . . ~ ~ . . ~ ~ . . |
+  5 | . . ~ ~ . . ~ ~ . . |
+  4 | . . . . . . . . . . |
+  3 | . . . . . . . . . . |
+  2 | . . . . . . . . . . |
+  1 | K . . . . . . . . . |
+    +---------------------+
+      a b c d e f g h i j      (hoofdletters rood, kleine letters blauw)
+PV: 1. Le10-e9 Lf10-f9 2. Le9-e8 Lf9-f8 3. Le8-e7 Lf8-f7 4. Le7-e6 Lf7-f6 5. Le6-e5 Lf6-f5 6. Le5-e4 Lf5-f4 7. Le4-d4 Lf4-e4 8. Ld4-c4 Le4-d4 9. Lc4-b4 Ld4-c4 10. Lb4-b5 Lc4-b4 11. Lb5-b6 Lb4-b5 12. Lb6-b7 Lb5-b6 13. Lb7-c7 Lb6-b7 14. Lc7-d7 Lb7-c7 15. Ld7-e7 Lc7-d7 16. Le7-f7 Ld7-e7 17. Lf7-g7 Le7-f7 18. Lg7-h7 Lf7-g7 19. Lh7-i7 Lg7-h7 20. Li7-i8 Lh7-h8 21. Li8-i9 Sj9-j8 22. Ka1-a2 Lh8-i8 23. Li9-j9 Sj8-j7 24. Ka2-a3 Li8-j8 25. Lj9-i9 Sj7-j6 26. Ka3-a4 Lj8-i8 27. Li9-j9 Li8-i7 28. Ka4-b4 Li7-j7 29. Lj9-i9 Lj7-j8 30. Kb4-c4 Lj8-i8 31. Li9-j9 Sj6-j5 32. Kc4-d4 Sj5-j4 33. Kd4-e4 Sj4-j3 34. Ke4-e5 Sj3-j2 35. Ke5-e6 Li8-i9 36. Lj9-j8 Sj2-i2 37. Ke6-e7 Li9-i8 38. Lj8-j9 Si2-i3 39. Ke7-e8 Li8-i9 40. Lj9-j8 Li9-h9 41. Ke8-f8 Lh9-h8 42. Lj8-j9 Lh8-i8 43. Kf8-g8 Li8-i9 44. Lj9-j8 Li9-j9 45. Lj8-j7 Lj9-j8 46. Lj7-i7 Lj8-j7 47. Li7-h7 Lj7-j6 48. Kg8-h8 Lj6-j5 49. Kh8-i8 Lj5-j4 50. Ki8-i7 Lj4-j3 51. Ki7-i6 Si3-i4 52. Ki6-i5 Si4-h4 53. Ki5-i4 Sh4-g4 54. Ki4-i3 Lj3-j4 55. Ki3-h3 Sg4-f4 56. Kh3-g3 Lj4-j5 57. Kg3-f3 Sf4-g4 58. Kf3-f4 Sg4-g3 59. Lh7-g7 Lj5-j6 60. Lg7-f7 Lj6-j7 61. Lf7-f6 Lj7-j8 62. Lf6-f5 Sg3-h3 63. Kf4-g4 Sh3-i3 64. Kg4-h4 Si3-j3 65. Kh4-i4 Lj8-j9 66. Ki4-j4 Sj3-i3 67. Lf5-f4 Lj9-j10 68. Kj4-i4 Si3-j3 69. Lf4-f3 Lj10-j9 70. Lf3-g3 Sj3-j2 71. Lg3-g2 Sj2-j1 72. Lg2-g1 Lj9-j10 73. Lg1-h1 Sj1-j2 74. Lh1-h2 Lj10-j9 75. Lh2-i2 Sj2-j1 76. Li2-i1 Lj9-j8 77. Li1xj1 Lj8-j7 78. Ki4-i5 Lj7-i7 79. Ki5-i6 Li7-h7 80. Ki6-i7 Lh7-g7 81. Ki7-h7 Lg7-f7 82. Kh7-g7 Lf7-f6 83. Kg7-f7 Lf6-f5 84. Kf7-e7 Lf5-f4 85. Ke7-d7 Lf4-f3 86. Lj1-j2 Lf3-e3 87. Lj2-j3 Le3-e4 88. Lj3-i3 Le4-d4 89. Kd7-c7 Ld4-d3 90. Li3-i4 Ld3-e3 91. Li4-h4 Le3-e4 92. Lh4-g4 Le4-d4 93. Lg4-f4 Ld4-d3 94. Lf4-e4 Ld3-d2 95. Le4-e3 Ld2-d1 96. Le3-e2 Ld1-c1 97. Le2-d2 Lc1-b1 98. Ld2-c2 Lb1-a1 99. Lc2-b2 La1-a2 100. Lb2xa2(ruil)
+
+exit=0 tijd=651s

@@ -36,6 +36,7 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <bit>
 #include <stdexcept>
 #include <chrono>
 #include <cstdint>
@@ -480,8 +481,74 @@ void pv(Pos p)
         std::cout << '\n';
 }
 
-// Lean, symmetric build for one database in which only red can win (-lean). One byte per entry for the value and
-// for the best capture value, a 4-bit move counter per side to move, no queues: every level is a scan over the table.
+// Atomic bitset over 64-bit words, for the frontier sets of the lean build.
+struct Bits
+{
+        std::vector<std::uint64_t> w;
+        void assign(std::uint64_t n) { w.assign((n + 63) / 64, 0); }
+        void clear() { std::ranges::fill(w, 0); }
+        void set(std::uint64_t i) { std::atomic_ref<std::uint64_t>(w[i >> 6]).fetch_or(std::uint64_t{1} << (i & 63), std::memory_order_relaxed); }
+        void reset(std::uint64_t i) { std::atomic_ref<std::uint64_t>(w[i >> 6]).fetch_and(~(std::uint64_t{1} << (i & 63)), std::memory_order_relaxed); }
+        bool test(std::uint64_t i) { return (std::atomic_ref<std::uint64_t>(w[i >> 6]).load(std::memory_order_relaxed) >> (i & 63)) & 1; }
+        template<class F>
+        void for_each(F&& f) const         // parallel over the words, f(i) for every set bit
+        {
+#pragma omp parallel for schedule(dynamic, 1 << 12)
+                for (std::int64_t k = 0; k < static_cast<std::int64_t>(w.size()); ++k) {
+                        for (auto b = w[k]; b != 0; b &= b - 1) { f(std::uint64_t(k) * 64 + std::uint64_t(std::countr_zero(b))); }
+                }
+        }
+};
+
+// Every parent index of a child (in the child's frame; encode() maps it to the canonical image), parent to move: mv.
+template<class F>
+void for_each_parent(Slice const& sl, Pos const& child, int mv, F&& f)
+{
+        auto const& R = child.side[mv].r;
+        if (unlimited()) {
+                for (auto k = 0; k < child.side[mv].n; ++k) {
+                        auto const y = child.side[mv].sq[k];
+                        for (auto d = 0; d < 4; ++d) {
+                                auto const x = nb[y][d];
+                                if (x < 0 || child.occupied(x)) { continue; }
+                                auto pp = child;
+                                pp.stm = mv;
+                                pp.side[mv].sq[k] = x;
+                                pp.side[mv].normalise();
+                                f(encode(sl, pp));
+                        }
+                }
+                return;
+        }
+        if (R.sq < 0) { return; }                       // entry state: no parent inside the database
+        auto const y = R.sq, x = nb[y][R.dir], e = rev(R.dir);
+        if (x < 0 || child.occupied(x)) { return; }
+        auto parent = child;
+        parent.stm = mv;
+        auto& P = parent.side[mv];
+        P.sq[P.at(y)] = x;
+        P.normalise();
+        auto const visit = [&](Restr const& prev) { auto pp = parent; pp.side[mv].r = prev; f(encode(sl, pp)); };
+        if (R.cnt < K - 1) { visit({ x, e, R.cnt + 1 }); return; }
+        visit({});
+        for (auto d = 0; d < 4; ++d) {
+                if (d == e || nb[x][d] < 0) { continue; }
+                for (auto c = 0; c < K; ++c) { visit({ x, d, c }); }
+        }
+        for (auto k = 0; k < child.side[mv].n; ++k) {
+                auto const other = child.side[mv].sq[k];
+                if (other == y) { continue; }
+                for (auto d = 0; d < 4; ++d) {
+                        if (nb[other][d] < 0) { continue; }
+                        for (auto c = 0; c < K; ++c) { visit({ other, d, c }); }
+                }
+        }
+}
+
+// Lean, symmetric build for one database in which only red can win (-lean): one byte per entry (to8) and three
+// bitsets, no move counters. Leapfrog, two plies per iteration: the blue-to-move losses at level lv make their
+// red-to-move parents wins at lv + 1; the blue-to-move parents of those wins become candidates, and every candidate is
+// verified once (all its moves must lead to final red wins) and then becomes a loss at lv + 2.
 void build_lean(Slice& sl, std::string const& key, std::chrono::steady_clock::time_point t0)
 {
         using clock = std::chrono::steady_clock;
@@ -495,113 +562,118 @@ void build_lean(Slice& sl, std::string const& key, std::chrono::steady_clock::ti
                         if (got == sl.val8.size()) { std::cout << std::format("{:6} geladen uit {}\n", key, name); return; }
                 }
         }
-        sl.out8.assign(2 * size, 255);
-        sl.cnt4.assign(size, 0);
-        auto const at = [](std::uint8_t& b) { return std::atomic_ref<std::uint8_t>(b); };
+        auto const at = [&](std::uint64_t i, int s) { return std::atomic_ref<std::uint8_t>(sl.val8[i * 2 + std::uint64_t(s)]); };
+        Bits A, B, T;                   // A, B: frontier / candidates (alternating roles), T: red win found by a capture
+        A.assign(size); B.assign(size); T.assign(size);
+        std::vector<std::vector<std::uint64_t>> pending(506);  // blue-to-move losses with a known level, sparse
+        auto const elapsed = [&] { return std::chrono::duration<double>(clock::now() - t0).count(); };
 
-#pragma omp parallel for schedule(dynamic, 1 << 14)
-        for (std::int64_t ii = 0; ii < static_cast<std::int64_t>(size); ++ii) {
-                auto const i = static_cast<std::uint64_t>(ii);
-                std::uint8_t counts = 0;
-                for (auto s = 0; s < 2; ++s) {
-                        auto const p = decode(sl, i, s);
-                        if (!valid(p)) { sl.val8[i * 2 + s] = 254; continue; }
-                        auto inside = 0;
-                        auto best = UNKNOWN;
-                        auto const n = for_each_move(p, [&](Pos const& c, bool in, auto&&...) {
-                                if (in) { ++inside; return; }
-                                auto const v = backup(child_value(c));
-                                if (best == UNKNOWN || pref(v) > pref(best)) { best = v; }
-                        });
-                        if (n == 0) { sl.val8[i * 2 + s] = to8(terminal(p), s); continue; }
-                        if (inside == 0) { sl.val8[i * 2 + s] = to8(best, s); continue; }
-                        counts |= static_cast<std::uint8_t>(inside << (4 * s));
-                        sl.out8[i * 2 + s] = to8(best, s);
-                }
-                sl.cnt4[i] = counts;
-        }
-        std::cout << std::format("{:6} initialisatie klaar na {:.0f}s\n", key, std::chrono::duration<double>(clock::now() - t0).count()) << std::flush;
-
-        auto longest = 0;
-        for (auto lv = 0; lv <= 504; ++lv) {
-                auto const s = lv % 2 == 0 ? 1 : 0;             // even: blue to move loses, odd: red to move wins
-                auto const mv = 1 - s;
-                auto const code = to8(static_cast<value_t>(lv), s);
-                std::uint64_t processed = 0;
-#pragma omp parallel for schedule(dynamic, 1 << 16) reduction(+ : processed)
+#pragma omp parallel
+        {
+                std::vector<std::vector<std::uint64_t>> local(506);
+#pragma omp for schedule(dynamic, 1 << 14)
                 for (std::int64_t ii = 0; ii < static_cast<std::int64_t>(size); ++ii) {
                         auto const i = static_cast<std::uint64_t>(ii);
-                        auto cur = at(sl.val8[i * 2 + s]).load(std::memory_order_relaxed);
-                        if (cur == 255 && s == 0 && sl.out8[i * 2 + s] == code) {       // a win by a capture, not faster inside
-                                auto expected = std::uint8_t{255};
-                                if (at(sl.val8[i * 2 + s]).compare_exchange_strong(expected, code)) { cur = code; } else { cur = expected; }
-                        }
-                        if (cur != code) { continue; }
-                        ++processed;
-                        auto const child = decode(sl, i, s);
-                        auto const visit_index = [&](std::uint64_t pi) {
-                                auto& pb = sl.val8[pi * 2 + mv];
-                                if (at(pb).load(std::memory_order_relaxed) != 255) { return; }
-                                if (lv % 2 == 0) {                      // the child loses: the parent wins at lv + 1
-                                        auto expected = std::uint8_t{255};
-                                        at(pb).compare_exchange_strong(expected, to8(static_cast<value_t>(lv + 1), mv));
-                                        return;
-                                }
-                                auto const old = at(sl.cnt4[pi]).fetch_sub(static_cast<std::uint8_t>(1 << (4 * mv)));
-                                if (((old >> (4 * mv)) & 15) != 1) { return; }
-                                auto const o = from8(sl.out8[pi * 2 + mv], mv);
-                                auto L = -1;
-                                if (o == UNKNOWN) { L = lv + 1; } else if (o < DRAW && !(o & 1)) { L = std::max(lv + 1, int(o)); }
-                                if (L >= 0) { auto expected = std::uint8_t{255}; at(pb).compare_exchange_strong(expected, to8(static_cast<value_t>(L), mv)); }
-                        };
-                        auto const& R = child.side[mv].r;
-                        if (unlimited()) {
-                                for (auto k = 0; k < child.side[mv].n; ++k) {
-                                        auto const y = child.side[mv].sq[k];
-                                        for (auto d = 0; d < 4; ++d) {
-                                                auto const x = nb[y][d];
-                                                if (x < 0 || child.occupied(x)) { continue; }
-                                                auto pp = child;
-                                                pp.stm = mv;
-                                                pp.side[mv].sq[k] = x;
-                                                pp.side[mv].normalise();
-                                                visit_index(encode(sl, pp));
-                                        }
-                                }
-                                continue;
-                        }
-                        if (R.sq < 0) { continue; }
-                        auto const y = R.sq, x = nb[y][R.dir], e = rev(R.dir);
-                        if (x < 0 || child.occupied(x)) { continue; }
-                        auto parent = child;
-                        parent.stm = mv;
-                        auto& P = parent.side[mv];
-                        P.sq[P.at(y)] = x;
-                        P.normalise();
-                        auto const visit = [&](Restr const& prev) { auto pp = parent; pp.side[mv].r = prev; visit_index(encode(sl, pp)); };
-                        if (R.cnt < K - 1) {
-                                visit({ x, e, R.cnt + 1 });
-                        } else {
-                                visit({});
-                                for (auto d = 0; d < 4; ++d) {
-                                        if (d == e || nb[x][d] < 0) { continue; }
-                                        for (auto c = 0; c < K; ++c) { visit({ x, d, c }); }
-                                }
-                                for (auto k = 0; k < child.side[mv].n; ++k) {
-                                        auto const other = child.side[mv].sq[k];
-                                        if (other == y) { continue; }
-                                        for (auto d = 0; d < 4; ++d) {
-                                                if (nb[other][d] < 0) { continue; }
-                                                for (auto c = 0; c < K; ++c) { visit({ other, d, c }); }
-                                        }
+                        for (auto s = 0; s < 2; ++s) {
+                                auto const p = decode(sl, i, s);
+                                if (!valid(p)) { sl.val8[i * 2 + s] = 254; continue; }
+                                auto inside = 0;
+                                auto best = UNKNOWN;
+                                auto const n = for_each_move(p, [&](Pos const& c, bool in, auto&&...) {
+                                        if (in) { ++inside; return; }
+                                        auto const v = backup(child_value(c));
+                                        if (best == UNKNOWN || pref(v) > pref(best)) { best = v; }
+                                });
+                                auto const v = n == 0 ? terminal(p) : inside == 0 ? best : UNKNOWN;
+                                if (s == 0) {           // red to move: a win by a capture is provisional unless no move stays inside
+                                        auto const w = v != UNKNOWN ? v : best;
+                                        if (w < DRAW && (w & 1)) { sl.val8[i * 2] = to8(w, 0); T.set(i); }
+                                        else if (v != UNKNOWN) { sl.val8[i * 2] = to8(v, 0); }
+                                } else if (v != UNKNOWN) {
+                                        sl.val8[i * 2 + 1] = to8(v, 1);
+                                        if (v < DRAW) { local[v].push_back(i); }
                                 }
                         }
                 }
-                if (processed > 0) { longest = lv; }
-                if (lv % 50 == 49) { std::cout << std::format("{:6} niveau {} na {:.0f}s\n", key, lv + 1, std::chrono::duration<double>(clock::now() - t0).count()) << std::flush; }
+#pragma omp critical
+                for (auto l = 0; l < 506; ++l) { pending[l].insert(pending[l].end(), local[l].begin(), local[l].end()); }
         }
-        std::vector<std::uint8_t>().swap(sl.out8);
-        std::vector<std::uint8_t>().swap(sl.cnt4);
+        std::cout << std::format("{:6} initialisatie klaar na {:.0f}s\n", key, elapsed()) << std::flush;
+
+        auto longest = 0;
+        auto* F = &A;                   // blue-to-move losses at the current level
+        auto* G = &B;
+        for (auto i : pending[0]) { F->set(i); }
+        for (auto lv = 0; lv + 2 <= 504; lv += 2) {
+                auto const win = to8(static_cast<value_t>(lv + 1), 0);
+                // 1. losses at lv -> their red-to-move parents win at lv + 1 (also overriding a slower capture win)
+                std::uint64_t nl = 0;
+                F->for_each([&](std::uint64_t i) {
+#pragma omp atomic
+                        ++nl;
+                        auto const child = decode(sl, i, 1);
+                        for_each_parent(sl, child, 0, [&](std::uint64_t pi) {
+                                auto a = at(pi, 0);
+                                auto cur = a.load(std::memory_order_relaxed);
+                                while (cur == 255 || (cur < 253 && cur > win && T.test(pi))) {
+                                        if (a.compare_exchange_weak(cur, win)) { T.reset(pi); G->set(pi); return; }
+                                }
+                        });
+                });
+                if (nl > 0) { longest = lv; }
+                F->clear();
+                // 2. capture wins at lv + 1 that no faster win replaced are final now
+#pragma omp parallel for schedule(dynamic, 1 << 12)
+                for (std::int64_t k = 0; k < static_cast<std::int64_t>(T.w.size()); ++k) {
+                        for (auto b = T.w[k]; b != 0; b &= b - 1) {
+                                auto const i = std::uint64_t(k) * 64 + std::uint64_t(std::countr_zero(b));
+                                if (sl.val8[i * 2] == win) { G->set(i); }
+                        }
+                }
+                // 3. wins at lv + 1 -> their unknown blue-to-move parents become candidates (in F, now empty)
+                std::uint64_t nw = 0;
+                G->for_each([&](std::uint64_t i) {
+#pragma omp atomic
+                        ++nw;
+                        auto const child = decode(sl, i, 0);
+                        for_each_parent(sl, child, 1, [&](std::uint64_t pi) { if (at(pi, 1).load(std::memory_order_relaxed) == 255) { F->set(pi); } });
+                });
+                if (nw > 0) { longest = lv + 1; }
+                G->clear();
+                // 4. verify every candidate once: all moves must lead to final red wins (inside: at most lv + 1)
+                std::vector<std::uint64_t> later;
+                F->for_each([&](std::uint64_t i) {
+                        auto const p = decode(sl, i, 1);
+                        auto ok = true;
+                        auto L = 0;
+                        for_each_move(p, [&](Pos const& c, bool in, auto&&...) {
+                                if (!ok) { return; }
+                                value_t v;
+                                if (in) {
+                                        auto const b = sl.val8[encode(sl, c) * 2];
+                                        if (b > win) { ok = false; return; }     // unknown, draw, or a capture win still provisional
+                                        v = from8(b, 0);
+                                } else {
+                                        v = child_value(c);
+                                        if (!(v < DRAW && (v & 1))) { ok = false; return; }
+                                }
+                                L = std::max(L, int(v) + 1);
+                        });
+                        if (!ok) { return; }
+                        sl.val8[i * 2 + 1] = to8(static_cast<value_t>(L), 1);
+                        if (L == lv + 2) { G->set(i); }
+                        else {
+#pragma omp critical
+                                later.push_back(i);
+                        }
+                });
+                F->clear();
+                for (auto i : later) { pending[from8(sl.val8[i * 2 + 1], 1)].push_back(i); }
+                for (auto i : pending[lv + 2]) { G->set(i); }
+                std::swap(F, G);
+                if (lv % 50 == 48) { std::cout << std::format("{:6} niveau {} na {:.0f}s\n", key, lv + 2, elapsed()) << std::flush; }
+        }
+        A = {}; B = {}; T = {};
         for (auto& b : sl.val8) { if (b == 255) { b = 253; } }
 
         std::uint64_t errors = 0;
