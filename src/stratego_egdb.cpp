@@ -1090,18 +1090,25 @@ void forward_solve(Slice& sl)
         std::ranges::replace(sl.val, UNKNOWN, DRAW);
 }
 
-// Is this blue move a chasing move: a non-capturing move next to a red piece that the moved piece threatens? With the
-// two-square rule in the state we know which red piece moved last, and only a move next to that piece (the piece that
-// just evaded) counts as chasing; without it (k = inf) every such approach counts.
+// Is this blue move a chasing move? A chase is attack, evade, attack again: blue moves next to a red piece it threatens,
+// and that red piece has just evaded, i.e. its last move started on a square next to a blue piece that threatened it.
+// The two-square state tells which red piece moved last and where it came from. Without it (k = inf) every approach
+// to a threatened red piece counts; when no red move is known yet (red unrestricted) nothing counts.
 inline bool blue_attack(Pos const& p, int from, int to)
 {
         if (p.stm != 1 || p.side[0].at(to) >= 0) { return false; }
         auto const i = p.side[1].at(from);
-        auto const last = p.side[0].r.sq;              // square of the red piece that moved last (-1: unknown or none)
+        auto const& R = p.side[0].r;
+        auto const prev = R.sq >= 0 ? nb[R.sq][R.dir] : -1;     // where the red piece that moved last came from
         for (auto y : nb[to]) {
                 auto const t = y >= 0 ? p.side[0].at(y) : -1;
                 if (t < 0 || attack(p.side[1].rk[i], p.side[0].rk[t]) < 0) { continue; }
-                if (unlimited() || y == last) { return true; }          // no red move yet (last < 0): no chase
+                if (unlimited()) { return true; }
+                if (y != R.sq || prev < 0) { continue; }
+                for (auto z : nb[prev]) {                       // was it threatened there by a blue piece?
+                        auto const b = z >= 0 ? p.side[1].at(z) : -1;
+                        if (b >= 0 && attack(p.side[1].rk[b], p.side[0].rk[t]) >= 0) { return true; }
+                }
         }
         return false;
 }
