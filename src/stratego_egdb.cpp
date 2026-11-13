@@ -1150,7 +1150,8 @@ bool chase_equal_only = false;          // (no longer used)
 
 // Is this blue move a chasing move in the sense of ISF rule 11 (more-squares rule)? To threaten is to move a piece next to
 // an opponent piece (any rank); to evade is to move the threatened piece away in the very next move; a chasing move
-// threatens a piece that has just evaded. Exception 11.2: a chasing move back to the square the chasing piece came from
+// threatens an opponent piece (any one) while the opponent keeps evading: red's last move moved a threatened piece
+// away. Exception 11.2: a chasing move back to the square the chasing piece came from
 // in the directly preceding turn is allowed, but it does not interrupt the chase. The two-square state tells
 // which piece of each side moved last and where it came from. At k = inf this is not known: then every move next to a
 // red piece counts.
@@ -1167,7 +1168,7 @@ inline bool blue_attack(Pos const& p, int from, int to)
         auto threatened_before = false;                 // was the red piece next to a blue piece before it moved (it evaded)?
         for (auto z : nb[prev]) { if (z >= 0 && p.side[1].at(z) >= 0) { threatened_before = true; } }
         if (!threatened_before) { return false; }
-        for (auto y : nb[to]) { if (y == R.sq) { return true; } }      // threatening the piece that just evaded
+        for (auto y : nb[to]) { if (y >= 0 && p.side[0].at(y) >= 0) { return true; } }    // threatening any red piece
         return false;
 }
 
