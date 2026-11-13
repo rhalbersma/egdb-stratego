@@ -1,0 +1,207 @@
+2-1: 376740 placements, 2-2: 16764930 placements
+  2L-1S ply   1:      27692
+  2L-1S ply   2:        696
+  2L-1S ply   3:       1884
+  2L-1S ply   4:       1320
+  2L-1S ply   5:       3052
+  2L-1S ply   6:       2364
+  2L-1S ply   7:       5536
+  2L-1S ply   8:       3804
+  2L-1S ply   9:       7040
+  2L-1S ply  10:       5280
+  2L-1S ply  11:       8316
+  2L-1S ply  12:       7112
+  2L-1S ply  13:      10876
+  2L-1S ply  14:       9972
+  2L-1S ply  15:      14260
+  2L-1S ply  16:      14380
+  2L-1S ply  17:      16532
+  2L-1S ply  18:      15756
+  2L-1S ply  19:      16208
+  2L-1S ply  20:      15916
+  2L-1S ply  21:      18308
+  2L-1S ply  22:      15556
+  2L-1S ply  23:      17776
+  2L-1S ply  24:      18668
+  2L-1S ply  25:      20072
+  2L-1S ply  26:      21400
+  2L-1S ply  27:      22468
+  2L-1S ply  28:      25052
+  2L-1S ply  29:      24740
+  2L-1S ply  30:      28868
+  2L-1S ply  31:      26840
+  2L-1S ply  32:      32212
+  2L-1S ply  33:      27344
+  2L-1S ply  34:      33192
+  2L-1S ply  35:      26580
+  2L-1S ply  36:      31932
+  2L-1S ply  37:      24160
+  2L-1S ply  38:      28660
+  2L-1S ply  39:      20696
+  2L-1S ply  40:      24124
+  2L-1S ply  41:      15588
+  2L-1S ply  42:      17732
+  2L-1S ply  43:       9972
+  2L-1S ply  44:      11092
+  2L-1S ply  45:       5496
+  2L-1S ply  46:       6012
+  2L-1S ply  47:       3300
+  2L-1S ply  48:       3540
+  2L-1S ply  49:       1316
+  2L-1S ply  50:       1388
+  2L-1S ply  51:        688
+  2L-1S ply  52:        712
+2L-1S: 0.2s, longest 52 plies
+  white to move W     376740 D          0 L          0
+  black to move W          0 D          0 L     376740
+  2L-2S ply   3:       4786
+  2L-2S ply   4:        160
+  2L-2S ply   5:       9442
+  2L-2S ply   6:        132
+  2L-2S ply   7:      16876
+  2L-2S ply   8:        468
+  2L-2S ply   9:      26224
+  2L-2S ply  10:        808
+  2L-2S ply  11:      36204
+  2L-2S ply  12:       1498
+  2L-2S ply  13:      50522
+  2L-2S ply  14:       2090
+  2L-2S ply  15:      71480
+  2L-2S ply  16:       3678
+  2L-2S ply  17:     100428
+  2L-2S ply  18:       5558
+  2L-2S ply  19:     110534
+  2L-2S ply  20:       9902
+  2L-2S ply  21:     119848
+  2L-2S ply  22:      13198
+  2L-2S ply  23:     122590
+  2L-2S ply  24:      19402
+  2L-2S ply  25:     149628
+  2L-2S ply  26:      25090
+  2L-2S ply  27:     176556
+  2L-2S ply  28:      35748
+  2L-2S ply  29:     212130
+  2L-2S ply  30:      43372
+  2L-2S ply  31:     248080
+  2L-2S ply  32:      53642
+  2L-2S ply  33:     279454
+  2L-2S ply  34:      59588
+  2L-2S ply  35:     290818
+  2L-2S ply  36:      67316
+  2L-2S ply  37:     284350
+  2L-2S ply  38:      69134
+  2L-2S ply  39:     270544
+  2L-2S ply  40:      72240
+  2L-2S ply  41:     233906
+  2L-2S ply  42:      74544
+  2L-2S ply  43:     200956
+  2L-2S ply  44:      80462
+  2L-2S ply  45:     164204
+  2L-2S ply  46:      83798
+  2L-2S ply  47:     151024
+  2L-2S ply  48:      96784
+  2L-2S ply  49:     142682
+  2L-2S ply  50:     105048
+  2L-2S ply  51:     146886
+  2L-2S ply  52:     126084
+  2L-2S ply  53:     165936
+  2L-2S ply  54:     137792
+  2L-2S ply  55:     184386
+  2L-2S ply  56:     157648
+  2L-2S ply  57:     198556
+  2L-2S ply  58:     182632
+  2L-2S ply  59:     228348
+  2L-2S ply  60:     217848
+  2L-2S ply  61:     251828
+  2L-2S ply  62:     246686
+  2L-2S ply  63:     280628
+  2L-2S ply  64:     281628
+  2L-2S ply  65:     308620
+  2L-2S ply  66:     323046
+  2L-2S ply  67:     356014
+  2L-2S ply  68:     386642
+  2L-2S ply  69:     411916
+  2L-2S ply  70:     462522
+  2L-2S ply  71:     491746
+  2L-2S ply  72:     560050
+  2L-2S ply  73:     565166
+  2L-2S ply  74:     647580
+  2L-2S ply  75:     635690
+  2L-2S ply  76:     745454
+  2L-2S ply  77:     692610
+  2L-2S ply  78:     827914
+  2L-2S ply  79:     761090
+  2L-2S ply  80:     929972
+  2L-2S ply  81:     740782
+  2L-2S ply  82:     928030
+  2L-2S ply  83:     711162
+  2L-2S ply  84:     903156
+  2L-2S ply  85:     728326
+  2L-2S ply  86:     921010
+  2L-2S ply  87:     773568
+  2L-2S ply  88:     969430
+  2L-2S ply  89:     776950
+  2L-2S ply  90:     973856
+  2L-2S ply  91:     762582
+  2L-2S ply  92:     949810
+  2L-2S ply  93:     660356
+  2L-2S ply  94:     836328
+  2L-2S ply  95:     579668
+  2L-2S ply  96:     732314
+  2L-2S ply  97:     450150
+  2L-2S ply  98:     592790
+  2L-2S ply  99:     394620
+  2L-2S ply 100:     505068
+  2L-2S ply 101:     303436
+  2L-2S ply 102:     398984
+  2L-2S ply 103:     259850
+  2L-2S ply 104:     323444
+  2L-2S ply 105:     181256
+  2L-2S ply 106:     229344
+  2L-2S ply 107:     133412
+  2L-2S ply 108:     159264
+  2L-2S ply 109:      74292
+  2L-2S ply 110:      90480
+  2L-2S ply 111:      49454
+  2L-2S ply 112:      57016
+  2L-2S ply 113:      20540
+  2L-2S ply 114:      24272
+  2L-2S ply 115:      11840
+  2L-2S ply 116:      13176
+2L-2S: 20.7s, longest 116 plies
+  white to move W   16764930 D          0 L          0
+  black to move W          0 D          0 L   16764930
+verify 2L-1S: 0 errors, 2L-2S: 0 errors
+
+langste met rood aan zet: 115 plies, luitenanten a1 b1, sergeanten f1 i1
+    +---------------------+
+ 10 | . . . . . . . . . . |
+  9 | . . . . . . . . . . |
+  8 | . . . . . . . . . . |
+  7 | . . . . . . . . . . |
+  6 | . . ~ ~ . . ~ ~ . . |
+  5 | . . ~ ~ . . ~ ~ . . |
+  4 | . . . . . . . . . . |
+  3 | . . . . . . . . . . |
+  2 | . . . . . . . . . . |
+  1 | L L . . . S . . S . |
+    +---------------------+
+      a b c d e f g h i j
+PV: 1. a1-a2 f1-f2 2. a2-a3 f2-f3 3. a3-a4 f3-f4 4. a4-a5 f4-f5 5. a5-a6 f5-f6 6. a6-a7 f6-f7 7. a7-a8 f7-f8 8. a8-b8 f8-f9 9. b8-b9 f9-f8 10. b1-b2 f8-f9 11. b9-c9 f9-f10 12. c9-d9 f10-g10 13. d9-e9 g10-h10 14. e9-e10 h10-i10 15. e10-f10 i10-j10 16. f10-g10 j10-j9 17. g10-h10 j9-j10 18. h10-i10 j10-j9 19. b2-b3 j9-j8 20. i10-i9 j8-j7 21. i9-i8 j7-j6 22. i8-i7 j6-j5 23. i7-i6 j5-j4 24. i6-i5 j4-j3 25. i5-i4 i1-j1 26. b3-c3 j1-i1 27. c3-d3 i1-j1 28. d3-e3 j1-i1 29. e3-f3 i1-h1 30. i4-i3 j3-j4 31. i3-i2 j4-j5 32. f3-f2 j5-j6 33. f2-g2 j6-j7 34. i2-i1 h1-h2 35. g2xh2 j7-j8 36. i1-i2 j8-j7 37. i2-i3 j7-j8 38. i3-i4 j8-j7 39. i4-i5 j7-i7 40. i5-i6 i7-h7 41. i6-i7 h7-g7 42. i7-h7 g7-f7 43. h7-g7 f7-f6 44. g7-f7 f6-f5 45. f7-e7 f5-f4 46. e7-d7 f4-f5 47. h2-h3 f5-f4 48. h3-g3 f4-e4 49. g3-f3 e4-d4 50. f3-e3 d4-c4 51. d7-c7 c4-d4 52. c7-b7 d4-c4 53. e3-d3 c4-b4 54. d3-c3 b4-b5 55. b7-b6 b5-b4 56. b6-b5 b4-a4 57. c3-b3 a4-a5 58. b5xa5
+
+langste met blauw aan zet: 116 plies, luitenanten a1 b1, sergeanten f1 h1
+    +---------------------+
+ 10 | . . . . . . . . . . |
+  9 | . . . . . . . . . . |
+  8 | . . . . . . . . . . |
+  7 | . . . . . . . . . . |
+  6 | . . ~ ~ . . ~ ~ . . |
+  5 | . . ~ ~ . . ~ ~ . . |
+  4 | . . . . . . . . . . |
+  3 | . . . . . . . . . . |
+  2 | . . . . . . . . . . |
+  1 | L L . . . S . S . . |
+    +---------------------+
+      a b c d e f g h i j
+PV: 1... f1-f2 1. a1-a2 f2-f3 2. a2-a3 f3-f4 3. a3-a4 f4-f5 4. a4-a5 f5-f6 5. a5-a6 f6-f7 6. a6-a7 f7-f8 7. a7-a8 f8-f9 8. a8-b8 f9-f10 9. b8-b9 f10-g10 10. b1-b2 g10-h10 11. b9-c9 h10-i10 12. c9-c10 i10-j10 13. c10-d10 j10-j9 14. d10-e10 j9-j10 15. e10-f10 j10-j9 16. f10-g10 j9-j10 17. g10-h10 j10-j9 18. h10-i10 h1-h2 19. b2-b3 j9-j8 20. i10-i9 j8-j7 21. i9-i8 j7-j6 22. i8-i7 j6-j5 23. b3-c3 j5-j6 24. c3-d3 j6-j5 25. i7-i6 j5-j4 26. i6-i5 j4-j3 27. i5-i4 h2-h1 28. i4-i3 j3-j4 29. i3-i2 j4-j5 30. d3-e3 j5-j6 31. e3-f3 j6-j7 32. f3-f2 j7-j8 33. f2-g2 j8-j9 34. i2-i1 h1-h2 35. g2xh2 j9-j8 36. i1-i2 j8-j7 37. i2-i3 j7-j8 38. i3-i4 j8-j7 39. i4-i5 j7-i7 40. i5-i6 i7-h7 41. i6-i7 h7-g7 42. i7-h7 g7-f7 43. h7-g7 f7-f6 44. g7-f7 f6-f5 45. f7-e7 f5-f4 46. e7-d7 f4-f5 47. h2-h3 f5-f4 48. h3-g3 f4-e4 49. g3-f3 e4-d4 50. f3-e3 d4-c4 51. d7-c7 c4-d4 52. c7-b7 d4-c4 53. e3-d3 c4-b4 54. d3-c3 b4-b5 55. b7-b6 b5-b4 56. b6-b5 b4-a4 57. c3-b3 a4-a5 58. b5xa5
+exit=0

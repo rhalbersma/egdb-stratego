@@ -1,0 +1,88 @@
+  LOST blauw aan zet, verlies in 22: rood L c2, blauw S a1 b1, beperking rood: geen, blauw: a1 naar noord nog 0x
+  LOST blauw aan zet, verlies in 22: rood L c2, blauw S a1 b1, beperking rood: c2 naar noord nog 0x, blauw: a1 naar noord nog 0x
+  LOST blauw aan zet, verlies in 22: rood L c2, blauw S a1 b1, beperking rood: c2 naar noord nog 1x, blauw: a1 naar noord nog 0x
+  LOST blauw aan zet, verlies in 22: rood L c2, blauw S a1 b1, beperking rood: c2 naar noord nog 2x, blauw: a1 naar noord nog 0x
+  LOST blauw aan zet, verlies in 22: rood L c2, blauw S a1 b1, beperking rood: c2 naar oost nog 0x, blauw: a1 naar noord nog 0x
+  LOST blauw aan zet, verlies in 22: rood L c2, blauw S a1 b1, beperking rood: c2 naar oost nog 1x, blauw: a1 naar noord nog 0x
+  LOST blauw aan zet, verlies in 22: rood L c2, blauw S a1 b1, beperking rood: c2 naar oost nog 2x, blauw: a1 naar noord nog 0x
+  LOST blauw aan zet, verlies in 22: rood L c2, blauw S a1 b1, beperking rood: c2 naar zuid nog 1x, blauw: a1 naar noord nog 0x
+  LOST blauw aan zet, verlies in 22: rood L c2, blauw S a1 b1, beperking rood: c2 naar zuid nog 2x, blauw: a1 naar noord nog 0x
+  LOST blauw aan zet, verlies in 22: rood L c2, blauw S a1 b1, beperking rood: c2 naar west nog 1x, blauw: a1 naar noord nog 0x
+  LOST blauw aan zet, verlies in 22: rood L c2, blauw S a1 b1, beperking rood: c2 naar west nog 2x, blauw: a1 naar noord nog 0x
+  LOST blauw aan zet, verlies in 22: rood L h2, blauw S i1 j1, beperking rood: geen, blauw: j1 naar noord nog 0x
+  LOST blauw aan zet, verlies in 22: rood L h2, blauw S i1 j1, beperking rood: h2 naar noord nog 0x, blauw: j1 naar noord nog 0x
+  LOST blauw aan zet, verlies in 22: rood L h2, blauw S i1 j1, beperking rood: h2 naar noord nog 1x, blauw: j1 naar noord nog 0x
+  LOST blauw aan zet, verlies in 22: rood L h2, blauw S i1 j1, beperking rood: h2 naar noord nog 2x, blauw: j1 naar noord nog 0x
+  LOST blauw aan zet, verlies in 22: rood L h2, blauw S i1 j1, beperking rood: h2 naar oost nog 1x, blauw: j1 naar noord nog 0x
+  LOST blauw aan zet, verlies in 22: rood L h2, blauw S i1 j1, beperking rood: h2 naar oost nog 2x, blauw: j1 naar noord nog 0x
+  LOST blauw aan zet, verlies in 22: rood L h2, blauw S i1 j1, beperking rood: h2 naar zuid nog 1x, blauw: j1 naar noord nog 0x
+  LOST blauw aan zet, verlies in 22: rood L h2, blauw S i1 j1, beperking rood: h2 naar zuid nog 2x, blauw: j1 naar noord nog 0x
+  LOST blauw aan zet, verlies in 22: rood L h2, blauw S i1 j1, beperking rood: h2 naar west nog 0x, blauw: j1 naar noord nog 0x
+  LOST blauw aan zet, verlies in 22: rood L h2, blauw S i1 j1, beperking rood: h2 naar west nog 1x, blauw: j1 naar noord nog 0x
+  LOST blauw aan zet, verlies in 22: rood L h2, blauw S i1 j1, beperking rood: h2 naar west nog 2x, blauw: j1 naar noord nog 0x
+  LOST blauw aan zet, verlies in 22: rood L b3, blauw S a1 a2, beperking rood: geen, blauw: a1 naar oost nog 0x
+  LOST blauw aan zet, verlies in 22: rood L b3, blauw S a1 a2, beperking rood: b3 naar noord nog 0x, blauw: a1 naar oost nog 0x
+  LOST blauw aan zet, verlies in 22: rood L b3, blauw S a1 a2, beperking rood: b3 naar noord nog 1x, blauw: a1 naar oost nog 0x
+  LOST blauw aan zet, verlies in 22: rood L b3, blauw S a1 a2, beperking rood: b3 naar noord nog 2x, blauw: a1 naar oost nog 0x
+  LOST blauw aan zet, verlies in 22: rood L b3, blauw S a1 a2, beperking rood: b3 naar oost nog 0x, blauw: a1 naar oost nog 0x
+  LOST blauw aan zet, verlies in 22: rood L b3, blauw S a1 a2, beperking rood: b3 naar oost nog 1x, blauw: a1 naar oost nog 0x
+  LOST blauw aan zet, verlies in 22: rood L b3, blauw S a1 a2, beperking rood: b3 naar oost nog 2x, blauw: a1 naar oost nog 0x
+  LOST blauw aan zet, verlies in 22: rood L b3, blauw S a1 a2, beperking rood: b3 naar zuid nog 1x, blauw: a1 naar oost nog 0x
+  LOST blauw aan zet, verlies in 22: rood L b3, blauw S a1 a2, beperking rood: b3 naar zuid nog 2x, blauw: a1 naar oost nog 0x
+  LOST blauw aan zet, verlies in 22: rood L b3, blauw S a1 a2, beperking rood: b3 naar west nog 1x, blauw: a1 naar oost nog 0x
+  LOST blauw aan zet, verlies in 22: rood L b3, blauw S a1 a2, beperking rood: b3 naar west nog 2x, blauw: a1 naar oost nog 0x
+  LOST blauw aan zet, verlies in 22: rood L i3, blauw S j1 j2, beperking rood: geen, blauw: j1 naar west nog 0x
+  LOST blauw aan zet, verlies in 22: rood L i3, blauw S j1 j2, beperking rood: i3 naar noord nog 0x, blauw: j1 naar west nog 0x
+  LOST blauw aan zet, verlies in 22: rood L i3, blauw S j1 j2, beperking rood: i3 naar noord nog 1x, blauw: j1 naar west nog 0x
+  LOST blauw aan zet, verlies in 22: rood L i3, blauw S j1 j2, beperking rood: i3 naar noord nog 2x, blauw: j1 naar west nog 0x
+  LOST blauw aan zet, verlies in 22: rood L i3, blauw S j1 j2, beperking rood: i3 naar oost nog 1x, blauw: j1 naar west nog 0x
+  LOST blauw aan zet, verlies in 22: rood L i3, blauw S j1 j2, beperking rood: i3 naar oost nog 2x, blauw: j1 naar west nog 0x
+  LOST blauw aan zet, verlies in 22: rood L i3, blauw S j1 j2, beperking rood: i3 naar zuid nog 1x, blauw: j1 naar west nog 0x
+  LOST blauw aan zet, verlies in 22: rood L i3, blauw S j1 j2, beperking rood: i3 naar zuid nog 2x, blauw: j1 naar west nog 0x
+  LOST blauw aan zet, verlies in 22: rood L i3, blauw S j1 j2, beperking rood: i3 naar west nog 0x, blauw: j1 naar west nog 0x
+  LOST blauw aan zet, verlies in 22: rood L i3, blauw S j1 j2, beperking rood: i3 naar west nog 1x, blauw: j1 naar west nog 0x
+  LOST blauw aan zet, verlies in 22: rood L i3, blauw S j1 j2, beperking rood: i3 naar west nog 2x, blauw: j1 naar west nog 0x
+  LOST blauw aan zet, verlies in 22: rood L b8, blauw S a9 a10, beperking rood: geen, blauw: a10 naar oost nog 0x
+  LOST blauw aan zet, verlies in 22: rood L b8, blauw S a9 a10, beperking rood: b8 naar noord nog 1x, blauw: a10 naar oost nog 0x
+  LOST blauw aan zet, verlies in 22: rood L b8, blauw S a9 a10, beperking rood: b8 naar noord nog 2x, blauw: a10 naar oost nog 0x
+  LOST blauw aan zet, verlies in 22: rood L b8, blauw S a9 a10, beperking rood: b8 naar oost nog 0x, blauw: a10 naar oost nog 0x
+  LOST blauw aan zet, verlies in 22: rood L b8, blauw S a9 a10, beperking rood: b8 naar oost nog 1x, blauw: a10 naar oost nog 0x
+  LOST blauw aan zet, verlies in 22: rood L b8, blauw S a9 a10, beperking rood: b8 naar oost nog 2x, blauw: a10 naar oost nog 0x
+  LOST blauw aan zet, verlies in 22: rood L b8, blauw S a9 a10, beperking rood: b8 naar zuid nog 0x, blauw: a10 naar oost nog 0x
+  LOST blauw aan zet, verlies in 22: rood L b8, blauw S a9 a10, beperking rood: b8 naar zuid nog 1x, blauw: a10 naar oost nog 0x
+  LOST blauw aan zet, verlies in 22: rood L b8, blauw S a9 a10, beperking rood: b8 naar zuid nog 2x, blauw: a10 naar oost nog 0x
+  LOST blauw aan zet, verlies in 22: rood L b8, blauw S a9 a10, beperking rood: b8 naar west nog 1x, blauw: a10 naar oost nog 0x
+  LOST blauw aan zet, verlies in 22: rood L b8, blauw S a9 a10, beperking rood: b8 naar west nog 2x, blauw: a10 naar oost nog 0x
+  LOST blauw aan zet, verlies in 22: rood L i8, blauw S j9 j10, beperking rood: geen, blauw: j10 naar west nog 0x
+  LOST blauw aan zet, verlies in 22: rood L i8, blauw S j9 j10, beperking rood: i8 naar noord nog 1x, blauw: j10 naar west nog 0x
+  LOST blauw aan zet, verlies in 22: rood L i8, blauw S j9 j10, beperking rood: i8 naar noord nog 2x, blauw: j10 naar west nog 0x
+  LOST blauw aan zet, verlies in 22: rood L i8, blauw S j9 j10, beperking rood: i8 naar oost nog 1x, blauw: j10 naar west nog 0x
+  LOST blauw aan zet, verlies in 22: rood L i8, blauw S j9 j10, beperking rood: i8 naar oost nog 2x, blauw: j10 naar west nog 0x
+  LOST blauw aan zet, verlies in 22: rood L i8, blauw S j9 j10, beperking rood: i8 naar zuid nog 0x, blauw: j10 naar west nog 0x
+  LOST blauw aan zet, verlies in 22: rood L i8, blauw S j9 j10, beperking rood: i8 naar zuid nog 1x, blauw: j10 naar west nog 0x
+  LOST blauw aan zet, verlies in 22: rood L i8, blauw S j9 j10, beperking rood: i8 naar zuid nog 2x, blauw: j10 naar west nog 0x
+  LOST blauw aan zet, verlies in 22: rood L i8, blauw S j9 j10, beperking rood: i8 naar west nog 0x, blauw: j10 naar west nog 0x
+  LOST blauw aan zet, verlies in 22: rood L i8, blauw S j9 j10, beperking rood: i8 naar west nog 1x, blauw: j10 naar west nog 0x
+  LOST blauw aan zet, verlies in 22: rood L i8, blauw S j9 j10, beperking rood: i8 naar west nog 2x, blauw: j10 naar west nog 0x
+  LOST blauw aan zet, verlies in 22: rood L c9, blauw S a10 b10, beperking rood: geen, blauw: a10 naar zuid nog 0x
+  LOST blauw aan zet, verlies in 22: rood L c9, blauw S a10 b10, beperking rood: c9 naar noord nog 1x, blauw: a10 naar zuid nog 0x
+  LOST blauw aan zet, verlies in 22: rood L c9, blauw S a10 b10, beperking rood: c9 naar noord nog 2x, blauw: a10 naar zuid nog 0x
+  LOST blauw aan zet, verlies in 22: rood L c9, blauw S a10 b10, beperking rood: c9 naar oost nog 0x, blauw: a10 naar zuid nog 0x
+  LOST blauw aan zet, verlies in 22: rood L c9, blauw S a10 b10, beperking rood: c9 naar oost nog 1x, blauw: a10 naar zuid nog 0x
+  LOST blauw aan zet, verlies in 22: rood L c9, blauw S a10 b10, beperking rood: c9 naar oost nog 2x, blauw: a10 naar zuid nog 0x
+  LOST blauw aan zet, verlies in 22: rood L c9, blauw S a10 b10, beperking rood: c9 naar zuid nog 0x, blauw: a10 naar zuid nog 0x
+  LOST blauw aan zet, verlies in 22: rood L c9, blauw S a10 b10, beperking rood: c9 naar zuid nog 1x, blauw: a10 naar zuid nog 0x
+  LOST blauw aan zet, verlies in 22: rood L c9, blauw S a10 b10, beperking rood: c9 naar zuid nog 2x, blauw: a10 naar zuid nog 0x
+  LOST blauw aan zet, verlies in 22: rood L c9, blauw S a10 b10, beperking rood: c9 naar west nog 1x, blauw: a10 naar zuid nog 0x
+  LOST blauw aan zet, verlies in 22: rood L c9, blauw S a10 b10, beperking rood: c9 naar west nog 2x, blauw: a10 naar zuid nog 0x
+  LOST blauw aan zet, verlies in 22: rood L h9, blauw S i10 j10, beperking rood: geen, blauw: j10 naar zuid nog 0x
+  LOST blauw aan zet, verlies in 22: rood L h9, blauw S i10 j10, beperking rood: h9 naar noord nog 1x, blauw: j10 naar zuid nog 0x
+  LOST blauw aan zet, verlies in 22: rood L h9, blauw S i10 j10, beperking rood: h9 naar noord nog 2x, blauw: j10 naar zuid nog 0x
+  LOST blauw aan zet, verlies in 22: rood L h9, blauw S i10 j10, beperking rood: h9 naar oost nog 1x, blauw: j10 naar zuid nog 0x
+  LOST blauw aan zet, verlies in 22: rood L h9, blauw S i10 j10, beperking rood: h9 naar oost nog 2x, blauw: j10 naar zuid nog 0x
+  LOST blauw aan zet, verlies in 22: rood L h9, blauw S i10 j10, beperking rood: h9 naar zuid nog 0x, blauw: j10 naar zuid nog 0x
+  LOST blauw aan zet, verlies in 22: rood L h9, blauw S i10 j10, beperking rood: h9 naar zuid nog 1x, blauw: j10 naar zuid nog 0x
+  LOST blauw aan zet, verlies in 22: rood L h9, blauw S i10 j10, beperking rood: h9 naar zuid nog 2x, blauw: j10 naar zuid nog 0x
+  LOST blauw aan zet, verlies in 22: rood L h9, blauw S i10 j10, beperking rood: h9 naar west nog 0x, blauw: j10 naar zuid nog 0x
+  LOST blauw aan zet, verlies in 22: rood L h9, blauw S i10 j10, beperking rood: h9 naar west nog 1x, blauw: j10 naar zuid nog 0x
+  LOST blauw aan zet, verlies in 22: rood L h9, blauw S i10 j10, beperking rood: h9 naar west nog 2x, blauw: j10 naar zuid nog 0x
