@@ -5,7 +5,8 @@
 
 // Stratego endgame databases for small sets of ranked pieces with the tweeveldenregel (two-square rule) in the state,
 // classic 10x10 board with two lakes. At most 2 pieces per side.
-// Rules: one square orthogonally; in an attack the higher rank wins, equal ranks are both removed (M > K > L > S);
+// Rules: one square orthogonally; in an attack the higher rank wins, equal ranks are both removed (X > M > K > L > S > E),
+// except that the spy E wins when it attacks the marshal X;
 // a side without pieces has lost (both without pieces: draw); the side to move without a legal move loses, unless the
 // opponent could not move either: draw.
 // Tweeveldenregel with limit K: per side at most one restricted piece (square, direction back, count 0..K-1) that may
@@ -13,7 +14,8 @@
 // (count > 0 needed) -> (p, reverse e, count - 1), otherwise (p, reverse e, K - 1). When the restricted piece
 // disappears, its side is free. So a piece makes at most K consecutive moves between the same two squares.
 // Rank collapsing: only red-blue comparisons matter, so ranks are renumbered to the fewest levels (K vs L+S = L vs 2S,
-// 2L vs L = 2S vs S). Colours: red is the side with the highest piece, on equal highest pieces the side with more pieces.
+// 2L vs L = 2S vs S). Colours: red is the side with the highest piece, on equal highest pieces the side with more pieces,
+// on equal numbers the side with the stronger sorted ranks.
 // Each database is written to dump/k<limit>_<key>.db (one byte per index * 2 + side to move, see encode()) and
 // dump/k<limit>_<key>.bin (only the states in which nobody is restricted, placement * 2 + side to move); the directory
 // dump/ must exist.
@@ -41,7 +43,11 @@
 namespace {
 
 constexpr int W = 10, H = 10, N = 92;
-constexpr std::uint8_t INVALID = 253, DRAW = 254, UNKNOWN = 255;
+// Values in memory are 16 bits (some 4-piece wins are longer than 252 plies). Files use one byte per entry when every
+// value fits (253 = invalid, 254 = draw), otherwise two bytes (little endian, 65533 = invalid, 65534 = draw), with
+// the extensions .db16 and .bin16.
+using value_t = std::uint16_t;
+constexpr value_t INVALID = 65533, DRAW = 65534, UNKNOWN = 65535;
 std::array<int, N> fo{}, ro{};
 std::array<std::array<int, 4>, N> nb{};
 std::vector<std::pair<int, int>> pairs;
@@ -54,15 +60,40 @@ inline bool unlimited() { return K == 0; }
 
 inline std::uint64_t prank(int a, int b) { return std::uint64_t(b) * (b - 1) / 2 + a; }
 inline std::uint64_t binom(int n, int k) { return k == 0 ? 1 : k == 1 ? std::uint64_t(n) : std::uint64_t(n) * (n - 1) / 2; }
-int rank_of(char c) { return c == 'M' ? 7 : c == 'K' ? 6 : c == 'L' ? 5 : c == 'S' ? 4 : throw std::invalid_argument("rank"); }
-char letter(int r) { return r == 7 ? 'M' : r == 6 ? 'K' : r == 5 ? 'L' : 'S'; }
+// Ranks: E (spy) < S < L < K < M < X (marshal). The spy wins when it attacks the marshal and loses every other fight
+// except against the other spy (both removed); every piece that attacks the spy wins.
+constexpr int SPY = 1, MARSHAL = 8;
+int rank_of(char c)
+{
+        switch (c) {
+        case 'E': return SPY;
+        case 'S': return 4;
+        case 'L': return 5;
+        case 'K': return 6;
+        case 'M': return 7;
+        case 'X': return MARSHAL;
+        default: throw std::invalid_argument("rank");
+        }
+}
+char letter(int r) { return r == SPY ? 'E' : r == MARSHAL ? 'X' : r == 7 ? 'M' : r == 6 ? 'K' : r == 5 ? 'L' : 'S'; }
+// +1: the attacker wins, -1: the defender wins, 0: both are removed (canonical ranks: the spy code only occurs when
+// it faces an enemy marshal, see rank_map)
+inline int attack(int a, int b) { return a == SPY && b == MARSHAL ? 1 : a > b ? 1 : a < b ? -1 : 0; }
 
 // Rank collapsing: only comparisons between the two sides matter, so ranks are renumbered to the fewest levels
 // (S, L, K, M) that keep every red-blue comparison. Adjacent ranks held by one side only merge into one level.
 // Then colours are normalised: red is the side with the highest piece, on a tie the side with more pieces.
 // Returns true if the colours were swapped.
-bool canonical_ranks(std::array<std::vector<int>, 2>& rk)
+// Raw rank -> canonical rank. Only comparisons between red and blue matter, so the ranks are renumbered to the fewest
+// levels that keep every red-blue comparison: adjacent ranks held by one side only merge into one level. A spy that
+// faces an enemy marshal keeps its special role: then the spy and the marshal never merge with another rank and keep
+// the codes SPY and MARSHAL, while the other ranks become S, L, K, M from the bottom up. Otherwise the spy is just the
+// lowest rank and the marshal the highest.
+std::array<int, 9> rank_map(std::array<std::vector<int>, 2> const& rk)
 {
+        auto const has = [&](int s, int r) { return std::ranges::find(rk[s], r) != rk[s].end(); };
+        auto const special = (has(0, SPY) && has(1, MARSHAL)) || (has(1, SPY) && has(0, MARSHAL));
+        auto const is_special = [&](int r) { return special && (r == SPY || r == MARSHAL); };
         std::vector<std::pair<int, int>> v;             // (rank, side mask)
         for (auto s = 0; s < 2; ++s) {
                 for (auto r : rk[s]) {
@@ -71,15 +102,33 @@ bool canonical_ranks(std::array<std::vector<int>, 2>& rk)
                 }
         }
         std::ranges::sort(v);
-        std::map<int, int> level;
-        auto l = 0;
-        for (auto k = 0u; k < v.size(); ++k) {
-                if (k > 0 && !(v[k].second == v[k - 1].second && v[k].second != 3)) { ++l; }
-                level[v[k].first] = 4 + l;
+        std::vector<int> level(v.size());
+        for (auto k = 1uz; k < v.size(); ++k) {
+                auto const merge = !is_special(v[k].first) && !is_special(v[k - 1].first) && v[k].second == v[k - 1].second && v[k].second != 3;
+                level[k] = level[k - 1] + (merge ? 0 : 1);
         }
-        for (auto& side : rk) { for (auto& r : side) { r = level[r]; } std::ranges::sort(side, std::greater{}); }
+        auto base = -1;
+        for (auto k = 0uz; k < v.size(); ++k) { if (!is_special(v[k].first)) { base = level[k]; break; } }
+        std::array<int, 9> to{};
+        for (auto k = 0uz; k < v.size(); ++k) {
+                auto const r = v[k].first;
+                to[r] = is_special(r) ? r : 4 + level[k] - base;
+                if (to[r] > 7 && !is_special(r)) { throw std::invalid_argument("too many distinct ranks"); }
+        }
+        return to;
+}
+
+// Rank collapsing (rank_map) and colour normalisation: red is the side with the highest piece, on equal highest
+// pieces the side with more pieces, on equal numbers the side with the stronger sorted ranks. Returns true if the
+// colours were swapped.
+bool canonical_ranks(std::array<std::vector<int>, 2>& rk)
+{
+        auto const to = rank_map(rk);
+        for (auto& side : rk) { for (auto& r : side) { r = to[r]; } std::ranges::sort(side, std::greater{}); }
         auto const top = [](std::vector<int> const& x) { return x.empty() ? 0 : x[0]; };
-        if (top(rk[1]) > top(rk[0]) || (top(rk[1]) == top(rk[0]) && rk[1].size() > rk[0].size())) {
+        // red: the highest piece, then more pieces, then the stronger sorted ranks (KL-KS, not KS-KL)
+        if (top(rk[1]) > top(rk[0]) || (top(rk[1]) == top(rk[0]) && rk[1].size() > rk[0].size()) ||
+            (top(rk[1]) == top(rk[0]) && rk[1].size() == rk[0].size() && rk[1] > rk[0])) {
                 std::swap(rk[0], rk[1]);
                 return true;
         }
@@ -116,7 +165,7 @@ struct Slice
         std::array<int, 4> gside{}, gcount{}, gfirst{};
         int ng = 0;
         std::uint64_t place = 0, ws = 0, bs = 0, size = 0;
-        std::vector<std::uint8_t> val;                  // index * 2 + side to move
+        std::vector<value_t> val;                       // index * 2 + side to move
 };
 std::map<std::string, Slice> slices;
 
@@ -192,35 +241,36 @@ inline bool allowed(Restr const& r, int from, int d) { return !(r.sq == from && 
 struct Canon
 {
         bool swap = false;
-        std::array<int, 8> to{};                        // raw rank -> canonical rank
+        std::array<int, 9> to{};                        // raw rank -> canonical rank
         std::string key;
         Slice const* slice = nullptr;                   // set once the canonical slice is built
 };
-std::array<Canon, 4096> canon_table;
+std::array<Canon, 65536> canon_table;            // code: 4 bits per rank, 2 ranks per side
 
 inline int material_code(Pos const& p)
 {
         auto code = 0, shift = 0;
-        for (auto const& sd : p.side) { for (auto i = 0; i < 2; ++i) { code |= (i < sd.n ? sd.rk[i] : 0) << shift; shift += 3; } }
+        for (auto const& sd : p.side) { for (auto i = 0; i < 2; ++i) { code |= (i < sd.n ? sd.rk[i] : 0) << shift; shift += 4; } }
         return code;
 }
 
 void init_canon()
 {
-        for (auto code = 0; code < 4096; ++code) {
+        for (auto code = 0; code < 65536; ++code) {
                 std::array<std::vector<int>, 2> rk;
+                auto ok = true;
                 for (auto s = 0; s < 2; ++s) {
-                        for (auto i = 0; i < 2; ++i) { auto const r = (code >> (3 * (2 * s + i))) & 7; if (r >= 4) { rk[s].push_back(r); } }
+                        for (auto i = 0; i < 2; ++i) {
+                                auto const r = (code >> (4 * (2 * s + i))) & 15;
+                                if (r == 0) { continue; }
+                                if (r == 2 || r == 3 || r > MARSHAL) { ok = false; } else { rk[s].push_back(r); }
+                        }
                 }
-                if (rk[0].empty() || rk[1].empty()) { continue; }
-                auto mapped = rk;
+                if (!ok || rk[0].empty() || rk[1].empty()) { continue; }
                 auto& c = canon_table[code];
+                c.to = rank_map(rk);
+                auto mapped = rk;
                 c.swap = canonical_ranks(mapped);
-                std::vector<std::pair<int, int>> v;
-                for (auto s = 0; s < 2; ++s) { for (auto r : rk[s]) { auto it = std::ranges::find(v, r, &std::pair<int, int>::first); if (it == v.end()) { v.push_back({ r, 1 << s }); } else { it->second |= 1 << s; } } }
-                std::ranges::sort(v);
-                auto l = 0;
-                for (auto k = 0u; k < v.size(); ++k) { if (k > 0 && !(v[k].second == v[k - 1].second && v[k].second != 3)) { ++l; } c.to[v[k].first] = 4 + l; }
                 for (auto r : mapped[0]) { c.key += letter(r); }
                 c.key += '-';
                 for (auto r : mapped[1]) { c.key += letter(r); }
@@ -236,7 +286,7 @@ inline Canon const& canonicalise(Pos& p)
         return t;
 }
 
-std::uint8_t child_value(Pos const& c0)
+value_t child_value(Pos const& c0)
 {
         auto const& me0 = c0.side[c0.stm];
         auto const& op0 = c0.side[1 - c0.stm];
@@ -269,8 +319,9 @@ int for_each_move(Pos const& p, F&& f)
                         M.sq[i] = to;
                         if (j < 0) { M.normalise(); f(c, true, from, to); continue; }
                         auto const a = p.side[me].rk[i], b = p.side[op].rk[j];
-                        if (a >= b) { O.remove(j); }
-                        if (a <= b) { M.remove(i); }                    // the moved piece is gone: its side is free
+                        auto const fight = attack(a, b);
+                        if (fight >= 0) { O.remove(j); }
+                        if (fight <= 0) { M.remove(i); }                // the moved piece is gone: its side is free
                         M.normalise(); O.normalise();
                         f(c, false, from, to);
                 }
@@ -278,14 +329,14 @@ int for_each_move(Pos const& p, F&& f)
         return n;
 }
 
-inline std::uint8_t backup(std::uint8_t c) { return c >= DRAW ? DRAW : static_cast<std::uint8_t>(c + 1); }
-inline int pref(std::uint8_t v) { return v >= DRAW ? 0 : (v & 1) ? 1000 - v : -1000 + v; }
+inline value_t backup(value_t c) { return c >= DRAW ? DRAW : static_cast<value_t>(c + 1); }
+inline int pref(value_t v) { return v >= DRAW ? 0 : (v & 1) ? 100000 - v : -100000 + v; }
 
-std::uint8_t terminal(Pos const& p)
+value_t terminal(Pos const& p)
 {
         auto q = p;
         q.stm ^= 1;
-        return for_each_move(q, [](Pos const&, bool, auto&&...) {}) > 0 ? std::uint8_t{0} : DRAW;
+        return for_each_move(q, [](Pos const&, bool, auto&&...) {}) > 0 ? value_t{0} : DRAW;
 }
 
 std::string describe(Pos const& p)
@@ -339,7 +390,7 @@ void pv(Pos p)
                 std::cout << ' ' << pc << nm(fr) << (j >= 0 ? 'x' : '-') << nm(tt);
                 if (j >= 0) {
                         auto const a = p.side[me].rk[i], b = p.side[op].rk[j];
-                        if (a == b) { std::cout << "(ruil)"; } else if (a < b) { std::cout << "(sneuvelt)"; }
+                        auto const fight = attack(a, b); if (fight == 0) { std::cout << "(ruil)"; } else if (fight < 0) { std::cout << "(sneuvelt)"; }
                 }
                 p = next;
         }
@@ -388,14 +439,24 @@ void build(std::string const& red0, std::string const& blue0)
         auto const size = sl.size;
         sl.val.assign(2 * size, UNKNOWN);
         if (load) {
-                auto const full = std::format("dump/k{}_{}.db", unlimited() ? std::string("inf") : std::to_string(K), key);
-                if (auto f = std::fopen(full.c_str(), "rb")) {
-                        auto const got = std::fread(sl.val.data(), 1, sl.val.size(), f);
+                auto const base = std::format("dump/k{}_{}.db", unlimited() ? std::string("inf") : std::to_string(K), key);
+                if (auto f = std::fopen((base + "16").c_str(), "rb")) {
+                        auto const got = std::fread(sl.val.data(), sizeof(value_t), sl.val.size(), f);
                         std::fclose(f);
-                        if (got == sl.val.size()) { std::cout << std::format("{:6} geladen uit {}\n", key, full); return; }
+                        if (got == sl.val.size()) { std::cout << std::format("{:6} geladen uit {}16\n", key, base); return; }
+                } else if (auto g = std::fopen(base.c_str(), "rb")) {
+                        std::vector<std::uint8_t> b(sl.val.size());
+                        auto const got = std::fread(b.data(), 1, b.size(), g);
+                        std::fclose(g);
+                        if (got == b.size()) {
+                                for (auto i = 0uz; i < b.size(); ++i) { sl.val[i] = b[i] == 253 ? INVALID : b[i] == 254 ? DRAW : b[i]; }
+                                std::cout << std::format("{:6} geladen uit {}\n", key, base);
+                                return;
+                        }
                 }
         }
-        std::array<std::vector<std::uint8_t>, 2> cnt, out, done;
+        std::array<std::vector<std::uint8_t>, 2> cnt, done;
+        std::array<std::vector<value_t>, 2> out;
         for (auto s = 0; s < 2; ++s) { cnt[s].assign(size, 0); out[s].assign(size, UNKNOWN); done[s].assign(size, 0); }
 
 #pragma omp parallel for schedule(dynamic, 1 << 14)
@@ -433,7 +494,7 @@ void build(std::string const& red0, std::string const& blue0)
                         auto const i = q[qi] >> 1;
                         auto const s = static_cast<int>(q[qi] & 1);
                         auto& v = sl.val[(i) * 2 + s];
-                        if (v == UNKNOWN) { v = static_cast<std::uint8_t>(lv); }
+                        if (v == UNKNOWN) { v = static_cast<value_t>(lv); }
                         if (v != lv || done[s][i]) { continue; }
                         done[s][i] = 1;
                         longest = lv;
@@ -444,11 +505,11 @@ void build(std::string const& red0, std::string const& blue0)
                                 auto const pi = encode(sl, pp);
                                 auto& pv = sl.val[(pi) * 2 + mv];
                                 if (pv != UNKNOWN) { return; }
-                                if (lv % 2 == 0) { pv = static_cast<std::uint8_t>(lv + 1); bucket[lv + 1].push_back(pi << 1 | std::uint64_t(mv)); return; }
+                                if (lv % 2 == 0) { pv = static_cast<value_t>(lv + 1); bucket[lv + 1].push_back(pi << 1 | std::uint64_t(mv)); return; }
                                 if (--cnt[mv][pi] != 0) { return; }
                                 auto const o = out[mv][pi];
-                                if (o == UNKNOWN) { pv = static_cast<std::uint8_t>(lv + 1); bucket[lv + 1].push_back(pi << 1 | std::uint64_t(mv)); }
-                                else if (o < DRAW && !(o & 1)) { auto const L = std::max(lv + 1, int(o)); if (L == lv + 1) { pv = static_cast<std::uint8_t>(L); } bucket[L].push_back(pi << 1 | std::uint64_t(mv)); }
+                                if (o == UNKNOWN) { pv = static_cast<value_t>(lv + 1); bucket[lv + 1].push_back(pi << 1 | std::uint64_t(mv)); }
+                                else if (o < DRAW && !(o & 1)) { auto const L = std::max(lv + 1, int(o)); if (L == lv + 1) { pv = static_cast<value_t>(L); } bucket[L].push_back(pi << 1 | std::uint64_t(mv)); }
                         };
                         if (unlimited()) {
                                 for (auto k = 0; k < child.side[mv].n; ++k) {
@@ -480,18 +541,18 @@ void build(std::string const& red0, std::string const& blue0)
                                 auto& pv = sl.val[(pi) * 2 + mv];
                                 if (pv != UNKNOWN) { return; }
                                 if (lv % 2 == 0) {
-                                        pv = static_cast<std::uint8_t>(lv + 1);
+                                        pv = static_cast<value_t>(lv + 1);
                                         bucket[lv + 1].push_back(pi << 1 | std::uint64_t(mv));
                                         return;
                                 }
                                 if (--cnt[mv][pi] != 0) { return; }
                                 auto const o = out[mv][pi];
                                 if (o == UNKNOWN) {
-                                        pv = static_cast<std::uint8_t>(lv + 1);
+                                        pv = static_cast<value_t>(lv + 1);
                                         bucket[lv + 1].push_back(pi << 1 | std::uint64_t(mv));
                                 } else if (o < DRAW && !(o & 1)) {
                                         auto const L = std::max(lv + 1, int(o));
-                                        if (L == lv + 1) { pv = static_cast<std::uint8_t>(L); }
+                                        if (L == lv + 1) { pv = static_cast<value_t>(L); }
                                         bucket[L].push_back(pi << 1 | std::uint64_t(mv));
                                 }
                         };
@@ -537,6 +598,9 @@ void build(std::string const& red0, std::string const& blue0)
 
         // statistics over valid states, and over states in which nobody is restricted
         std::array<std::array<std::uint64_t, 3>, 2> all{}, fresh{};
+        // states in which nobody is restricted, split by parity: the side to move "has the opposition" when the sum of
+        // file + rank over all pieces is odd (1 vs 1: red to move at odd distance, or blue to move at even distance)
+        std::array<std::array<std::array<std::uint64_t, 3>, 2>, 2> par{};     // [side to move][opposition][result]
         std::array<int, 2> lw{};
         std::array<std::uint64_t, 2> lwi{};
         for (auto s = 0; s < 2; ++s) {
@@ -547,6 +611,10 @@ void build(std::string const& red0, std::string const& blue0)
                         ++all[s][k];
                         if (i % (sl.ws * sl.bs) == 0) {
                                 ++fresh[s][k];
+                                auto const q = decode(sl, i, s);
+                                auto sum = 0;
+                                for (auto const& sd : q.side) { for (auto j = 0; j < sd.n; ++j) { sum += fo[sd.sq[j]] + ro[sd.sq[j]]; } }
+                                ++par[s][sum & 1][k];
                                 if (k == 0 && v > lw[s]) { lw[s] = v; lwi[s] = i; }
                         }
                 }
@@ -560,14 +628,30 @@ void build(std::string const& red0, std::string const& blue0)
                 if (lw[s]) { std::cout << std::format("  langste rode winst {} plies: {}", lw[s], describe(decode(sl, lwi[s], s))); }
                 std::cout << '\n';
         }
+        for (auto s = 0; s < 2; ++s) {
+                auto const pct = [&](int o, int k) { auto const t = double(par[s][o][0] + par[s][o][1] + par[s][o][2]); return t > 0 ? 100.0 * double(par[s][o][k]) / t : 0.0; };
+                std::cout << std::format("       {} aan zet, niemand beperkt | met oppositie: rood {:5.1f}% remise {:5.1f}% blauw {:5.1f}% | zonder oppositie: rood {:5.1f}% remise {:5.1f}% blauw {:5.1f}%\n",
+                        s == 0 ? "rood " : "blauw", pct(1, 0), pct(1, 1), pct(1, 2), pct(0, 0), pct(0, 1), pct(0, 2));
+        }
         {       // values of the states in which nobody is restricted: placement-major, side to move minor
-                std::vector<std::uint8_t> fv(2 * sl.place);
+                std::vector<value_t> fv(2 * sl.place);
                 for (auto i = std::uint64_t{0}; i < sl.place; ++i) { for (auto s = 0; s < 2; ++s) { fv[2 * i + s] = sl.val[(i * sl.ws * sl.bs) * 2 + s]; } }
-                auto const name = std::format("dump/k{}_{}.bin", unlimited() ? std::string("inf") : std::to_string(K), key);
-                if (auto f = std::fopen(name.c_str(), "wb")) { std::fwrite(fv.data(), 1, fv.size(), f); std::fclose(f); }
-                // the whole database: one byte per (index, side to move), index * 2 + stm, see encode()
-                auto const full = std::format("dump/k{}_{}.db", unlimited() ? std::string("inf") : std::to_string(K), key);
-                if (auto f = std::fopen(full.c_str(), "wb")) { std::fwrite(sl.val.data(), 1, sl.val.size(), f); std::fclose(f); }
+                auto const narrow = std::ranges::all_of(sl.val, [](value_t v) { return v < 253 || v >= INVALID; });
+                auto const write = [&](std::vector<value_t> const& v, std::string const& ext) {
+                        auto const name = std::format("dump/k{}_{}.{}{}", unlimited() ? std::string("inf") : std::to_string(K), key, ext, narrow ? "" : "16");
+                        auto f = std::fopen(name.c_str(), "wb");
+                        if (!f) { return; }
+                        if (narrow) {
+                                std::vector<std::uint8_t> b(v.size());
+                                for (auto i = 0uz; i < v.size(); ++i) { b[i] = v[i] == INVALID ? 253 : v[i] == DRAW ? 254 : static_cast<std::uint8_t>(v[i]); }
+                                std::fwrite(b.data(), 1, b.size(), f);
+                        } else {
+                                std::fwrite(v.data(), sizeof(value_t), v.size(), f);
+                        }
+                        std::fclose(f);
+                };
+                write(fv, "bin");       // nobody restricted
+                write(sl.val, "db");    // the whole database, index * 2 + stm, see encode()
         }
         if (lw[0]) {
                 std::cout << std::format("\nlangste rode winst met rood aan zet in {}: {} plies\n", key, lw[0]);

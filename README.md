@@ -12,6 +12,8 @@ is a parameter, so the effect of the rule on results and lengths can be measured
 * [L–S in closed form: opposition and the lake ring](#ls-in-closed-form-opposition-and-the-lake-ring)
 * [LS–L: the edge sergeant and the pendulum](#lsl-the-edge-sergeant-and-the-pendulum)
 * [L–SS: the corner curiosities](#lss-the-corner-curiosities)
+* [Two against two without the rule (k = ∞)](#two-against-two-without-the-rule-k--)
+* [Spy and marshal](#spy-and-marshal)
 * [Four pieces without the rule: 2L–2S](#four-pieces-without-the-rule-2l2s)
 * [Reproducing everything](#reproducing-everything)
 * [License](#license)
@@ -22,7 +24,7 @@ is a parameter, so the effect of the rule on results and lengths can be measured
 
 | Program | What it does |
 |---|---|
-| [`src/stratego_egdb.cpp`](src/stratego_egdb.cpp) | generic databases for up to 2 pieces per side, ranks S < L < K < M, two-square rule with limit `-k 1…` or `-k inf`, rank collapsing, retrograde analysis with move counters, OpenMP, full verification |
+| [`src/stratego_egdb.cpp`](src/stratego_egdb.cpp) | generic databases for up to 2 pieces per side, ranks E < S < L < K < M < X (spy and marshal included), two-square rule with limit `-k 1…` or `-k inf`, rank collapsing, retrograde analysis with move counters, OpenMP, full verification |
 | [`src/stratego22.cpp`](src/stratego22.cpp) | 2 lieutenants vs 1 and vs 2 sergeants without the two-square rule (4 pieces) |
 | [`scripts/table.py`](scripts/table.py) | summary tables from the logs |
 | [`scripts/no_capture.py`](scripts/no_capture.py) | red wins with red to move when red cannot attack at once |
@@ -330,6 +332,75 @@ in the four corners and in both orientations) × 11 red restriction states, all 
 Every blue move walks into the lieutenant (loss in 22 plies). Positions one red move away are won as well, e.g. red
 L b4 vs blue S a1 a2 with a1 restricted to the east: 1. Lb4-b3 wins in 23 plies.
 
+## Two against two without the rule (k = ∞)
+
+The ten canonical 2v2 databases ([log](results/2v2_kinf.log)), all verified. Cells: red wins / draw / blue wins in %.
+
+| Canonical | Example | Longest win | Red to move | Blue to move |
+|---|---|---|---|---|
+| SS–SS | 2L–2L | — | 0 / 100 / 0 | 0 / 100 / 0 |
+| LL–SS | 2L–2S | 116 | 100 / 0 / 0 | 100 / 0 / 0 |
+| LS–SS | K+L–2L | 85 | 12.2 / 87.8 / 0 | 3.2 / 96.8 / 0 |
+| LL–LS | 2K–K+L | 153 | 27.1 / 72.9 / 0 | 16.3 / 83.7 / 0 |
+| LS–LS | L+S–L+S | 47 | 0.3 / 99.7 / 0 | 0 / 99.7 / 0.3 |
+| KS–LL | K+S–2L | 43 | 0.6 / 99.4 / 0 | 0 / 100 / 0 |
+| KS–LS | K+S–L+S | 69 | 4.9 / 95.1 / 0 | 0.4 / 99.6 / 0 |
+| KL–LS | K+L–L+S | **326** | 97.2 / 2.8 / 0 | 92.0 / 8.0 / 0 |
+| KL–KS | K+L–K+S | 71 | 1.3 / 98.7 / 0 | 0.3 / 99.4 / 0.3 |
+| ML–KS | M+L–K+S | 73 | 4.9 / 95.1 / 0 | 0.4 / 99.6 / 0 |
+
+The verdicts follow from the reductions. KL–LS: once K captures S, KL–L (= LS–S) is always won; blue's only
+drawing try is the exchange of lieutenants into K–S (= L–S), which draws at the lake ring or without the
+opposition. Red avoids that exchange and wins the sergeant in 97% of the positions with red to move, but it can take
+up to 326 plies. KS–LL is a draw except for an immediate capture of a lieutenant (into KS–L); LL–SS is the enclosing
+method twice. The longest win in KL–LS starts from red K a1, L g1 vs blue L f1, S f9, red to move (325 plies).
+
+Split by opposition (states in which nobody is restricted). The side to move **has the opposition** when the sum of
+file + rank over all pieces is odd; for one piece each this is the L–S rule (red to move at odd distance, blue to move
+at even distance). Cells: red wins / draw / blue wins in %:
+
+| Canonical | Red to move, with opposition | Red to move, without | Blue to move, with opposition | Blue to move, without |
+|---|---|---|---|---|
+| SS–SS | 0 / 100 / 0 | 0 / 100 / 0 | 0 / 100 / 0 | 0 / 100 / 0 |
+| LL–SS | 100 / 0 / 0 | 100 / 0 / 0 | 100 / 0 / 0 | 100 / 0 / 0 |
+| LS–SS | 16.5 / 83.5 / 0 | 7.9 / 92.1 / 0 | 0.3 / 99.7 / 0 | 6.0 / 94.0 / 0 |
+| LL–LS | 39.6 / 60.4 / 0 | 14.7 / 85.3 / 0 | 5.5 / 94.5 / 0 | 27.0 / 73.0 / 0 |
+| LS–LS | 0.3 / 99.7 / 0 | 0.3 / 99.7 / 0 | 0 / 99.7 / 0.3 | 0 / 99.7 / 0.3 |
+| KS–LL | 0.6 / 99.4 / 0 | 0.6 / 99.4 / 0 | 0 / 100 / 0 | 0 / 100 / 0 |
+| KS–LS | 5.6 / 94.4 / 0 | 4.1 / 95.9 / 0 | 0 / 100 / 0 | 0.8 / 99.2 / 0 |
+| KL–LS | 97.7 / 2.3 / 0 | 96.7 / 3.3 / 0 | 90.9 / 9.1 / 0 | 93.1 / 6.9 / 0 |
+| KL–KS | 2.1 / 97.9 / 0 | 0.5 / 99.5 / 0 | 0 / 99.7 / 0.3 | 0.6 / 99.1 / 0.3 |
+| ML–KS | 5.6 / 94.4 / 0 | 4.3 / 95.7 / 0 | 0 / 100 / 0 | 0.8 / 99.2 / 0 |
+
+A reciprocal zugzwang in KL–LS: red L a1, K i9 vs blue L b2, S j10. Red to move draws, blue to move loses in 86
+plies. The sergeant in the corner cannot move (j9 and i10 are next to the captain) and the lieutenants block each
+other diagonally: a lieutenant that moves allows the exchange. Blue to move must give up b2 or the sergeant. Red to
+move must release the sergeant or allow the exchange into K–S with the wrong parity. Check it with
+`./build/stratego_egdb -k inf -load KL LS -pos La1,Ki9 Lb2,Sj10 r` (and `b`).
+
+## Spy and marshal
+
+The spy E wins when it attacks the marshal X; every piece that attacks the spy wins; E vs E is an exchange. When a
+spy faces an enemy marshal, rank collapsing keeps both apart ([log](results/spy_marshal_kinf.log), k = ∞):
+
+| Canonical | Longest win | Red to move | Blue to move |
+|---|---|---|---|
+| X–E | 29 | 11.0 / 83.5 / 5.5 | 5.5 / 83.5 / 11.0 |
+| XS–E | 52 | 100 / 0 / 0 | 96.6 / 3.4 / 0 |
+| X–SE | 43 | 0.4 / 91.8 / 7.7 | 0 / 83.7 / 16.3 |
+| XE–E | 52 | 100 / 0 / 0 | 96.3 / 3.7 / 0 |
+| XE–X | 52 | 100 / 0 / 0 | 96.3 / 3.7 / 0 |
+| XS–SE | **271** | 38.0 / 61.9 / 0.2 | 22.6 / 76.6 / 0.8 |
+| XS–LE | 73 | 4.7 / 95.1 / 0.2 | 0.3 / 98.7 / 1.0 |
+| XL–SE | 118 | 100 / 0 / 0 | 96.3 / 3.7 / 0 |
+| XS–XE | 69 | 1.2 / 98.6 / 0.2 | 0.2 / 95.4 / 4.3 |
+| XE–SE | 73 | 4.6 / 95.2 / 0.2 | 0.3 / 95.3 / 4.4 |
+| XE–XE | 55 | 7.6 / 92.3 / 0.2 | 0.2 / 92.3 / 7.6 |
+
+X–E is L–S made symmetric: whoever attacks first wins, so neither side approaches unless the other is in zugzwang,
+and red's percentages equal those of L–S, with blue winning the mirrored positions. With a spare piece the marshal
+wins (XS–E, XE–E, XE–X), except when blue to move can strike the marshal at once.
+
 ## Four pieces without the rule: 2L–2S
 
 [`src/stratego22.cpp`](src/stratego22.cpp), without the two-square rule: 2L–1S is won everywhere in at most 52 plies,
@@ -351,6 +422,8 @@ python3 scripts/compare.py dump 1 2 3 4 5
 python3 scripts/ls_criterion.py dump inf 1 2 3 4 5
 ./build/stratego_egdb -k 3 -load L LS -pos Le5,Se1 Lf2 r   # one position from the stored databases
 ./build/stratego22 > results/stratego22.log
+./build/stratego_egdb -k inf SS SS LL SS LS SS LL LS LS LS KS LL KS LS KL LS KL KS ML KS > results/2v2_kinf.log
+./build/stratego_egdb -k inf X E XS E X SE XE E XE X XE SE XE XE XL SE XS LE XS SE XS XE > results/spy_marshal_kinf.log
 ```
 
 A material pair is given as red and blue ranks (`L S`, `KL L`, …); it is canonicalised and its sub-databases are
