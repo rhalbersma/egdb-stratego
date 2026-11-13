@@ -31,6 +31,8 @@
 // -bits <key>: win/draw bits for red to move plus distances where red is free (only red can win); -check <key> also
 //   builds it normally and compares every state. With -load the bits are read from dump/ (then -pos works on them).
 // -strategic (before -bits): list the positions with nobody restricted that are drawn whichever side is to move.
+// -realdraw <key>|all: which draws survive the more-squares (chasing) rule: blue must keep the draw with finitely many
+//   attacks (moves next to a red piece it threatens).
 // -prefer: in main lines the winner prefers moving its lowest piece towards the opponent's lowest piece (among the
 //   moves that keep the fastest win).
 // -pos <red> <blue> <r|b>: after building or loading, print the value, a diagram and the main line of one position,
@@ -67,6 +69,8 @@ inline int rev(int d) { return d ^ 2; }
 // Tweeveldenregel limit: a piece may make at most K consecutive moves between the same two squares (K = 3: count 0..2).
 // K = 0 means unlimited (no restriction state at all).
 int K = 3;
+std::string realdraw_key;               // -realdraw <key>: which draws survive the more-squares (chasing) rule
+bool noattack = false;                  // -noattack: variant in which blue may not move a piece next to a red piece it threatens
 bool load = false;      // -load: read existing databases from dump/ instead of computing them
 inline bool unlimited() { return K == 0; }
 
@@ -385,6 +389,14 @@ int for_each_move(Pos const& p, F&& f)
                 for (auto d = 0; d < 4; ++d) {
                         auto const to = nb[from][d];
                         if (to < 0 || p.side[me].at(to) >= 0 || !allowed(p.side[me].r, from, d)) { continue; }
+                        if (noattack && me == 1 && p.side[op].at(to) < 0) {     // blue approaches a red piece it threatens: not allowed
+                                auto threat = false;
+                                for (auto y : nb[to]) {
+                                        auto const t = y >= 0 ? p.side[op].at(y) : -1;
+                                        if (t >= 0 && y != from && attack(p.side[me].rk[i], p.side[op].rk[t]) >= 0) { threat = true; }
+                                }
+                                if (threat) { continue; }
+                        }
                         ++n;
                         auto c = p;
                         c.stm = op;
@@ -1039,6 +1051,137 @@ void check_bits_against(Slice const& sl, BitsDb& db, std::string const& key)
         std::cout << std::format("{:6} check: {} toestanden, {} uitslagverschillen; {} afstanden vergeleken, {} verschillen\n", key, states, wdl, dists, dist) << std::flush;
 }
 
+// -noattack: forward solver (no unmoves), synchronous by plies: a state is a win in n (odd) if a move reaches a loss in
+// n - 1, a loss in n (even) if every move reaches a win of at most n - 1 and one of exactly n - 1.
+void forward_solve(Slice& sl)
+{
+        auto const size = sl.size;
+        sl.val.assign(2 * size, UNKNOWN);
+#pragma omp parallel for schedule(dynamic, 1 << 14)
+        for (std::int64_t ii = 0; ii < static_cast<std::int64_t>(size); ++ii) {
+                for (auto s = 0; s < 2; ++s) { if (!valid(decode(sl, std::uint64_t(ii), s))) { sl.val[std::uint64_t(ii) * 2 + s] = INVALID; } }
+        }
+        auto quiet = 0;
+        for (auto n = 0; n < 1000 && quiet < 6; ++n) {
+                std::uint64_t changed = 0;
+#pragma omp parallel for schedule(dynamic, 1 << 14) reduction(+ : changed)
+                for (std::int64_t ii = 0; ii < static_cast<std::int64_t>(size); ++ii) {
+                        auto const i = static_cast<std::uint64_t>(ii);
+                        for (auto s = 0; s < 2; ++s) {
+                                if (sl.val[i * 2 + s] != UNKNOWN) { continue; }
+                                auto const p = decode(sl, i, s);
+                                auto win = false, all_win = true, any_last = false;
+                                auto const cnt = for_each_move(p, [&](Pos const& c, bool, auto&&...) {
+                                        auto const v = backup(child_value(c));          // value for the side to move, child already decided or DRAW/unknown
+                                        if (v >= DRAW || v > n) { all_win = false; return; }
+                                        if (v & 1) { if (v == n) { win = true; } all_win = false; return; }
+                                        if (v == n) { any_last = true; }
+                                        if (v > n) { all_win = false; }
+                                });
+                                value_t r = UNKNOWN;
+                                if (cnt == 0) { if (n == 0) { r = terminal(p); } }
+                                else if (n % 2 == 1 && win) { r = static_cast<value_t>(n); }
+                                else if (n % 2 == 0 && all_win && any_last) { r = static_cast<value_t>(n); }
+                                if (r != UNKNOWN) { sl.val[i * 2 + s] = r; ++changed; }
+                        }
+                }
+                quiet = changed == 0 ? quiet + 1 : 0;
+        }
+        std::ranges::replace(sl.val, UNKNOWN, DRAW);
+}
+
+// Is this blue move a chasing move: a non-capturing move next to a red piece that the moved piece threatens? With the
+// two-square rule in the state we know which red piece moved last, and only a move next to that piece (the piece that
+// just evaded) counts as chasing; without it (k = inf) every such approach counts.
+inline bool blue_attack(Pos const& p, int from, int to)
+{
+        if (p.stm != 1 || p.side[0].at(to) >= 0) { return false; }
+        auto const i = p.side[1].at(from);
+        auto const last = p.side[0].r.sq;              // square of the red piece that moved last (-1: unknown or none)
+        for (auto y : nb[to]) {
+                auto const t = y >= 0 ? p.side[0].at(y) : -1;
+                if (t < 0 || attack(p.side[1].rk[i], p.side[0].rk[t]) < 0) { continue; }
+                if (unlimited() || y == last) { return true; }          // no red move yet (last < 0): no chase
+        }
+        return false;
+}
+
+// -realdraw: the draws of a database are only bounds under the more-squares (chasing) rule. A draw is real if blue can
+// keep it with finitely many attacks: the core Z (greatest fixpoint) are the draws blue keeps forever without attacking,
+// the connected draws A (least fixpoint) are those from which blue reaches Z, attacks allowed; repeat with A until
+// stable. The other draws are wins for red by the chasing rule. A draw in a smaller database counts as real.
+void real_draws(Slice const& sl, std::string const& key)
+{
+        auto const size = sl.size;
+        std::vector<std::uint8_t> D(2 * size, 0), Z, A;
+        std::uint64_t draws0 = 0;
+        for (auto i = 0uz; i < 2 * size; ++i) { if (sl.val[i] == DRAW) { D[i] = 1; ++draws0; } }
+        // a move from state (i, s): in-slice child index (or ~0 for a capture) and the capture value
+        auto const sweep = [&](auto&& keep) {           // one parallel pass, returns the number of changes
+                std::uint64_t changed = 0;
+#pragma omp parallel for schedule(dynamic, 1 << 14) reduction(+ : changed)
+                for (std::int64_t ii = 0; ii < static_cast<std::int64_t>(size); ++ii) {
+                        for (auto s = 0; s < 2; ++s) { changed += keep(static_cast<std::uint64_t>(ii), s); }
+                }
+                return changed;
+        };
+        auto rounds = 0;
+        for (;; ++rounds) {
+                // core: draws kept forever without attacking
+                Z = D;
+                while (sweep([&](std::uint64_t i, int s) -> std::uint64_t {
+                        auto& z = Z[i * 2 + s];
+                        if (!z) { return 0; }
+                        auto const p = decode(sl, i, s);
+                        auto ok = s == 0;                       // red: every move must stay; blue: one quiet move must stay
+                        for_each_move(p, [&](Pos const& c, bool in, auto from, auto to) {
+                                auto const stays = in ? bool(Z[encode(sl, c) * 2 + std::uint64_t(c.stm)]) : child_value(c) >= DRAW;
+                                if (s == 0) { if (!stays) { ok = false; } }
+                                else if (stays && !blue_attack(p, from, to)) { ok = true; }
+                        });
+                        if (!ok) { z = 0; return 1; }
+                        return 0;
+                }) > 0) {}
+                // connected: draws from which blue reaches the core, attacks allowed
+                A = Z;
+                while (sweep([&](std::uint64_t i, int s) -> std::uint64_t {
+                        auto& a = A[i * 2 + s];
+                        if (a || !D[i * 2 + s]) { return 0; }
+                        auto const p = decode(sl, i, s);
+                        auto ok = s == 0;
+                        for_each_move(p, [&](Pos const& c, bool in, auto&&...) {
+                                auto const reach = in ? bool(A[encode(sl, c) * 2 + std::uint64_t(c.stm)]) : child_value(c) >= DRAW;
+                                if (s == 0) { if (!reach) { ok = false; } } else if (reach) { ok = true; }
+                        });
+                        if (ok) { a = 1; return 1; }
+                        return 0;
+                }) > 0) {}
+                if (A == D) { break; }
+                D = A;
+        }
+        std::array<std::array<std::uint64_t, 2>, 2> fresh{};    // [stm][real draws, all draws]
+        std::uint64_t real = 0;
+        for (auto i = 0uz; i < size; ++i) {
+                for (auto s = 0; s < 2; ++s) {
+                        if (sl.val[i * 2 + s] != DRAW) { continue; }
+                        real += D[i * 2 + s];
+                        if (i % (sl.ws * sl.bs) == 0) { ++fresh[s][1]; fresh[s][0] += D[i * 2 + s]; }
+                }
+        }
+        std::cout << std::format("{:6} meerveldenregel: {} van {} remises echt ({} rondes); niemand beperkt: rood aan zet {} van {}, blauw aan zet {} van {}\n",
+                key, real, draws0, rounds + 1, fresh[0][0], fresh[0][1], fresh[1][0], fresh[1][1]) << std::flush;
+        for (auto s = 0; s < 2; ++s) {         // a few examples, nobody restricted: real draws and draws only kept by chasing
+                auto shown_real = 0, shown_fake = 0;
+                for (auto i = 0uz; i < size && (shown_real < 3 || shown_fake < 3); i += sl.ws * sl.bs) {
+                        if (sl.val[i * 2 + s] != DRAW) { continue; }
+                        auto& c = D[i * 2 + s] ? shown_real : shown_fake;
+                        if (c >= 3) { continue; }
+                        ++c;
+                        std::cout << std::format("       {} aan zet, {}: {}\n", s == 0 ? "rood" : "blauw", D[i * 2 + s] ? "echte remise" : "remise alleen door achtervolgen", describe(decode(sl, i, s)));
+                }
+        }
+}
+
 void build(std::string const& red0, std::string const& blue0)
 {
         std::array<std::vector<int>, 2> rk;
@@ -1082,6 +1225,20 @@ void build(std::string const& red0, std::string const& blue0)
         sl.size = sl.place * sl.ws * sl.bs;
         auto const size = sl.size;
         if (sl.lean) { build_lean(sl, key, t0); return; }
+        if (noattack) {
+                forward_solve(sl);
+                std::array<std::array<std::uint64_t, 3>, 2> cntv{};
+                for (auto s = 0; s < 2; ++s) {
+                        for (auto i = std::uint64_t{0}; i < size; ++i) {
+                                auto const v = sl.val[i * 2 + s];
+                                if (v == INVALID || i % (sl.ws * sl.bs) != 0) { continue; }
+                                ++cntv[s][v >= DRAW ? 1 : ((s == 0) == bool(v & 1)) ? 0 : 2];
+                        }
+                }
+                std::cout << std::format("{:6} zonder aanvallen door blauw, niemand beperkt: rood aan zet rood/remise/blauw {}/{}/{}, blauw aan zet {}/{}/{}\n",
+                        key, cntv[0][0], cntv[0][1], cntv[0][2], cntv[1][0], cntv[1][1], cntv[1][2]) << std::flush;
+                return;
+        }
         if (key == bits_key && !check_bits) {
                 bits_db = std::make_unique<BitsDb>(build_bits(sl, key));
                 if (!load) { report_bits(*bits_db, key); }
@@ -1311,6 +1468,7 @@ void build(std::string const& red0, std::string const& blue0)
                 pv(p);
                 std::cout << '\n';
         }
+        if (key == realdraw_key || realdraw_key == "all") { real_draws(sl, key); }
         if (key == bits_key && check_bits) { auto db = build_bits(sl, key); report_bits(db, key); check_bits_against(sl, db, key); }
         std::cout << std::flush;
 }
@@ -1347,6 +1505,8 @@ int main(int argc, char* argv[])
         if (a < argc && std::string(argv[a]) == "-prefer") { prefer = true; ++a; }
         if (a + 1 < argc && std::string(argv[a]) == "-lean") { lean_key = argv[a + 1]; a += 2; }
         if (a < argc && std::string(argv[a]) == "-strategic") { strategic = true; ++a; }
+        if (a < argc && std::string(argv[a]) == "-noattack") { noattack = true; ++a; }
+        if (a + 1 < argc && std::string(argv[a]) == "-realdraw") { realdraw_key = argv[a + 1]; a += 2; }
         if (a + 1 < argc && (std::string(argv[a]) == "-bits" || std::string(argv[a]) == "-check")) { check_bits = std::string(argv[a]) == "-check"; bits_key = argv[a + 1]; a += 2; }
         // -pos <red> <blue> <r|b>, e.g. -pos Le5,Se1 Lf2 r: diagram and main line (the databases must be built or loaded)
         std::array<std::string, 3> pos_arg{};
