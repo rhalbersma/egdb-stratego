@@ -854,10 +854,15 @@ BitsDb build_bits(Slice const& base, std::string const& key)
         };
         std::vector<std::uint8_t> tval(trank.back());
         T.for_each([&](std::uint64_t i) { tval[rank(i)] = static_cast<std::uint8_t>((red_capture_win(decode(sl, i, 0)) + 1) / 2); });
+        auto const tmax = tval.empty() ? 0 : 2 * int(*std::ranges::max_element(tval)) - 1;      // longest provisional win
         std::cout << std::format("{:6} bits: initialisatie klaar na {:.0f}s, {} voorlopige slagwinsten\n", key, elapsed(), tval.size()) << std::flush;
 
         for (auto i : pending[0]) { F.set(i); }
+        auto pend_max = 0;
+        for (auto l = 0; l < 506; ++l) { if (!pending[l].empty()) { pend_max = l; } }
+        auto frontier = pending[0].size();
         for (auto lv = 0; lv + 2 <= 504; lv += 2) {
+                if (frontier == 0 && lv > pend_max && lv + 1 > tmax) { break; }        // nothing can change any more
                 auto const win = lv + 1;
                 // 1. blue losses at lv: their red parents win at lv + 1 (also before a slower capture win)
                 F.for_each([&](std::uint64_t i) {
@@ -878,6 +883,7 @@ BitsDb build_bits(Slice const& base, std::string const& key)
                 G.clear();
                 // 4. every candidate once: all its moves must lead to final red wins
                 std::vector<std::pair<int, std::uint64_t>> later;
+                frontier = 0;
                 F.for_each([&](std::uint64_t i) {
                         auto const p = decode(sl, i, 1);
                         auto ok = true;
@@ -891,15 +897,19 @@ BitsDb build_bits(Slice const& base, std::string const& key)
                                 L = std::max(L, int(v) + 1);
                         });
                         if (!ok) { return; }
-                        if (L == lv + 2) { G.set(i); }
-                        else {
+                        if (L == lv + 2) {
+                                G.set(i);
+#pragma omp atomic
+                                ++frontier;
+                        } else {
 #pragma omp critical
                                 later.push_back({ L, i });
                         }
                 });
                 F.clear();
-                for (auto [L, i] : later) { pending[L].push_back(i); }
+                for (auto [L, i] : later) { pending[L].push_back(i); pend_max = std::max(pend_max, L); }
                 for (auto i : pending[lv + 2]) { G.set(i); }
+                frontier += pending[lv + 2].size();
                 std::swap(F, G);
                 if (lv % 50 == 48) { std::cout << std::format("{:6} bits: niveau {} na {:.0f}s\n", key, lv + 2, elapsed()) << std::flush; }
         }
