@@ -23,11 +23,13 @@
 // 253 = unreachable restriction state.
 // Output per database: result percentages per side to move, longest win, verification, and the longest red win with
 // red to move as a diagram with principal variation (winner: fastest win, loser: slowest loss).
-// Usage: stratego_egdb [-k <limit>|-k inf] [-load] [-prefer] [-lean <key>] <red> <blue> [<red> <blue> ...] [-pos <red> <blue> <r|b>], e.g. "L S" "LL S" "KL L".
+// Usage: stratego_egdb [-k <limit>|-k inf] [-load] [-prefer] [-lean <key>] [-bits <key>|-check <key>] <red> <blue> [<red> <blue> ...] [-pos <red> <blue> <r|b>], e.g. "L S" "LL S" "KL L".
 // -k: at most <limit> consecutive moves of one piece between the same two squares (default 3), inf = no rule.
 // -load: read the databases from dump/ (as written by an earlier run) instead of computing them.
 // -lean <key>: build that database with the board symmetry (the unique highest red piece in a1-e5) and one byte per
 //   entry; only for databases in which red is the only side that can win (e.g. KL-LS).
+// -bits <key>: win/draw bits for red to move plus distances where red is free (only red can win); -check <key> also
+//   builds it normally and compares every state. With -load the bits are read from dump/ (then -pos works on them).
 // -prefer: in main lines the winner prefers moving its lowest piece towards the opponent's lowest piece (among the
 //   moves that keep the fastest win).
 // -pos <red> <blue> <r|b>: after building or loading, print the value, a diagram and the main line of one position,
@@ -44,6 +46,7 @@
 #include <format>
 #include <iostream>
 #include <map>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -801,6 +804,15 @@ BitsDb build_bits(Slice const& base, std::string const& key)
         auto const size = sl.size;
         db.W.assign(size);
         db.dtm.assign(sl.place * sl.bs, 0);
+        if (load) {             // -load: read the bits and distances written by an earlier run
+                auto const stem = std::format("dump/k{}_{}", unlimited() ? std::string("inf") : std::to_string(K), key);
+                auto f = std::fopen((stem + ".wdl").c_str(), "rb");
+                auto g = std::fopen((stem + ".dtm").c_str(), "rb");
+                auto ok = f && g && std::fread(db.W.w.data(), 8, db.W.w.size(), f) == db.W.w.size() && std::fread(db.dtm.data(), 1, db.dtm.size(), g) == db.dtm.size();
+                if (f) { std::fclose(f); }
+                if (g) { std::fclose(g); }
+                if (ok) { std::cout << std::format("{:6} bits geladen uit {}.wdl/.dtm\n", key, stem); return db; }
+        }
         Bits F, G, T;
         F.assign(size); G.assign(size); T.assign(size);
         std::vector<std::vector<std::uint64_t>> pending(506);
@@ -914,8 +926,13 @@ BitsDb build_bits(Slice const& base, std::string const& key)
                 if (lv % 50 == 48) { std::cout << std::format("{:6} bits: niveau {} na {:.0f}s\n", key, lv + 2, elapsed()) << std::flush; }
         }
         std::cout << std::format("{:6} bits: klaar na {:.0f}s\n", key, elapsed()) << std::flush;
+        auto const stem = std::format("dump/k{}_{}", unlimited() ? std::string("inf") : std::to_string(K), key);
+        if (auto f = std::fopen((stem + ".wdl").c_str(), "wb")) { std::fwrite(db.W.w.data(), 8, db.W.w.size(), f); std::fclose(f); }
+        if (auto f = std::fopen((stem + ".dtm").c_str(), "wb")) { std::fwrite(db.dtm.data(), 1, db.dtm.size(), f); std::fclose(f); }
         return db;
 }
+
+std::unique_ptr<BitsDb> bits_db;        // the -bits database, for -pos
 
 // statistics of a bits database (red to move from the bits, blue to move by one ply)
 void report_bits(BitsDb& db, std::string const& key)
@@ -1020,7 +1037,7 @@ void build(std::string const& red0, std::string const& blue0)
         sl.size = sl.place * sl.ws * sl.bs;
         auto const size = sl.size;
         if (sl.lean) { build_lean(sl, key, t0); return; }
-        if (key == bits_key && !check_bits) { auto db = build_bits(sl, key); report_bits(db, key); return; }
+        if (key == bits_key && !check_bits) { bits_db = std::make_unique<BitsDb>(build_bits(sl, key)); if (!load) { report_bits(*bits_db, key); } return; }
         sl.val.assign(2 * size, UNKNOWN);
         if (load) {
                 auto const base = std::format("dump/k{}_{}.db", unlimited() ? std::string("inf") : std::to_string(K), key);
@@ -1305,6 +1322,22 @@ int main(int argc, char* argv[])
                         p.side[s].normalise();
                 }
                 p.stm = pos_arg[2] == "r" ? 0 : 1;
+                if (bits_db) {
+                        auto q = p;
+                        auto const& t = canonicalise(q);
+                        if (t.key == bits_key) {
+                                if (q.stm == 0) {
+                                        auto const j = encode(bits_db->sl, q);
+                                        auto const w = bits_db->W.test(j);
+                                        std::cout << "\nwaarde voor de kant aan zet (bits): " << (!w ? std::string("remise") : bits_db->red_free(j) ? std::format("winst in {} plies", 2 * bits_db->dtm[bits_db->dtm_index(j)] - 1) : std::string("winst")) << "\n";
+                                } else {
+                                        auto const [lost, L] = blue_value(*bits_db, q);
+                                        std::cout << "\nwaarde voor de kant aan zet (bits): " << (!lost ? std::string("remise") : L >= 0 ? std::format("verlies in {} plies", L) : std::string("verlies")) << "\n";
+                                }
+                                diagram(p);
+                                return 0;
+                        }
+                }
                 auto const v = child_value(p);
                 std::cout << "\nwaarde voor de kant aan zet: " << (v >= DRAW ? std::string("remise") : std::format("{} in {} plies", (v & 1) ? "winst" : "verlies", int(v))) << "\n";
                 diagram(p);
