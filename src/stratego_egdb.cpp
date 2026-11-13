@@ -23,9 +23,11 @@
 // 253 = unreachable restriction state.
 // Output per database: result percentages per side to move, longest win, verification, and the longest red win with
 // red to move as a diagram with principal variation (winner: fastest win, loser: slowest loss).
-// Usage: stratego_egdb [-k <limit>|-k inf] [-load] <red> <blue> [<red> <blue> ...] [-pos <red> <blue> <r|b>], e.g. "L S" "LL S" "KL L".
+// Usage: stratego_egdb [-k <limit>|-k inf] [-load] [-prefer] <red> <blue> [<red> <blue> ...] [-pos <red> <blue> <r|b>], e.g. "L S" "LL S" "KL L".
 // -k: at most <limit> consecutive moves of one piece between the same two squares (default 3), inf = no rule.
 // -load: read the databases from dump/ (as written by an earlier run) instead of computing them.
+// -prefer: in main lines the winner prefers moving its lowest piece towards the opponent's lowest piece (among the
+//   moves that keep the fastest win).
 // -pos <red> <blue> <r|b>: after building or loading, print the value, a diagram and the main line of one position,
 //   e.g. stratego_egdb -k 3 -load L LS -pos Le5,Se1 Lf2 r
 
@@ -371,27 +373,46 @@ void diagram(Pos const& p)
 }
 
 // principal variation: the winner takes the fastest win, the loser the slowest loss
+// shortest-path distances on the board (lakes excluded), filled in main
+std::array<std::array<int, N>, N> dist{};
+// -prefer: among the moves that keep the best value, the winning side prefers moving its lowest piece towards the
+// opponent's lowest piece, then any move of its lowest piece, then the other moves
+bool prefer = false;
+
+// principal variation: the winner takes the fastest win, the loser the slowest loss
 void pv(Pos p)
 {
         std::cout << "PV:";
-        for (auto ply = 0; ply < 240; ++ply) {
+        auto move = 1;
+        if (p.stm == 1) { std::cout << " 1. \u2026"; }
+        for (auto ply = 0; ply < 400; ++ply) {
                 if (p.side[0].n == 0 || p.side[1].n == 0) { break; }
                 auto const target = child_value(p);
-                auto found = false; Pos next{}; int fr = -1, tt = -1;
-                for_each_move(p, [&](Pos const& c, bool, auto from, auto to) {
-                        if (found || backup(child_value(c)) != target) { return; }
-                        found = true; next = c; fr = from; tt = to;
-                });
-                if (!found) { break; }
                 auto const me = p.stm, op = 1 - p.stm;
+                auto const winning = target < DRAW && (target & 1);
+                auto const low = [](Side const& sd) { auto i = 0; for (auto k = 1; k < sd.n; ++k) { if (sd.rk[k] < sd.rk[i]) { i = k; } } return i; };
+                auto const my_low_rank = p.side[me].rk[low(p.side[me])];
+                auto const their_low = p.side[op].sq[low(p.side[op])];
+                auto best_score = -1; Pos next{}; int fr = -1, tt = -1;
+                for_each_move(p, [&](Pos const& c, bool, auto from, auto to) {
+                        if (backup(child_value(c)) != target) { return; }
+                        auto score = 0;
+                        if (prefer && winning && p.side[me].rk[p.side[me].at(from)] == my_low_rank) {
+                                score = 1;
+                                if (dist[to][their_low] < dist[from][their_low]) { score = 2; }
+                        }
+                        if (score > best_score) { best_score = score; next = c; fr = from; tt = to; }
+                });
+                if (best_score < 0) { break; }
                 auto const i = p.side[me].at(fr), j = p.side[op].at(tt);
                 auto const pc = letter(p.side[me].rk[i]);
-                if (me == 0) { std::cout << std::format(" {}.", ply / 2 + 1); }
+                if (me == 0) { std::cout << std::format(" {}.", move); }
                 std::cout << ' ' << pc << nm(fr) << (j >= 0 ? 'x' : '-') << nm(tt);
                 if (j >= 0) {
                         auto const a = p.side[me].rk[i], b = p.side[op].rk[j];
                         auto const fight = attack(a, b); if (fight == 0) { std::cout << "(ruil)"; } else if (fight < 0) { std::cout << "(sneuvelt)"; }
                 }
+                if (me == 1) { ++move; }
                 p = next;
         }
         std::cout << '\n';
@@ -675,10 +696,17 @@ int main(int argc, char* argv[])
         for (auto s = 0; s < N; ++s) { for (auto d = 0; d < 4; ++d) { auto const f = fo[s] + df[d], r = ro[s] + dr[d]; nb[s][d] = (f < 0 || f >= W || r < 0 || r >= H) ? -1 : id[f][r]; } }
         for (auto b = 1; b < N; ++b) { for (auto a = 0; a < b; ++a) { pairs.push_back({ a, b }); } }
         init_canon();
+        for (auto x = 0; x < N; ++x) {          // breadth-first distances from every square
+                for (auto& v : dist[x]) { v = 1000; }
+                std::vector<int> q{ x };
+                dist[x][x] = 0;
+                for (auto h = 0uz; h < q.size(); ++h) { for (auto y : nb[q[h]]) { if (y >= 0 && dist[x][y] == 1000) { dist[x][y] = dist[x][q[h]] + 1; q.push_back(y); } } }
+        }
         auto a = 1;
         if (argc > 2 && std::string(argv[1]) == "-k") { K = std::string(argv[2]) == "inf" ? 0 : std::stoi(argv[2]); a = 3; }
         std::cout << "tweeveldenregel: " << (unlimited() ? std::string("onbeperkt") : std::format("max {} zetten achter elkaar tussen twee velden", K)) << "\n\n";
         if (a < argc && std::string(argv[a]) == "-load") { load = true; ++a; }
+        if (a < argc && std::string(argv[a]) == "-prefer") { prefer = true; ++a; }
         // -pos <red> <blue> <r|b>, e.g. -pos Le5,Se1 Lf2 r: diagram and main line (the databases must be built or loaded)
         std::array<std::string, 3> pos_arg{};
         auto have_pos = false;

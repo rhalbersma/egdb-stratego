@@ -421,6 +421,7 @@ python3 scripts/no_capture.py dump 1 2 3 4 5 inf
 python3 scripts/compare.py dump 1 2 3 4 5
 python3 scripts/ls_criterion.py dump inf 1 2 3 4 5
 ./build/stratego_egdb -k 3 -load L LS -pos Le5,Se1 Lf2 r   # one position from the stored databases
+./build/stratego_egdb -k inf -load -prefer KL LS -pos La1,Ki9 La10,Sj10 r   # main line: the winner prefers its lowest piece
 ./build/stratego22 > results/stratego22.log
 ./build/stratego_egdb -k inf SS SS LL SS LS SS LL LS LS LS KS LL KS LS KL LS KL KS ML KS > results/2v2_kinf.log
 ./build/stratego_egdb -k inf X E XS E X SE XE E XE X XE SE XE XE XL SE XS LE XS SE XS XE > results/spy_marshal_kinf.log
