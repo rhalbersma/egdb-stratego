@@ -1,0 +1,34 @@
+bord classic (92 velden), k = 1: patronen per veld max 18, 94185 plaatsingen, 45922095 toestanden per kant aan zet, 0.09 GB
+seeds: 12084649 red wins in 1, 0 blue without a move (0 s)
+level   1: red wins     12084649 blue losses      2041372 (1 s)
+level   2: red wins      9362406 blue losses      2666306 (3 s)
+level   3: red wins      8107163 blue losses      4160912 (4 s)
+level   4: red wins      5979624 blue losses      6045173 (5 s)
+level   5: red wins      4952650 blue losses     12110045 (6 s)
+level   6: red wins      4188878 blue losses     13578664 (7 s)
+level   7: red wins      1219412 blue losses      5180638 (8 s)
+level   8: red wins        27313 blue losses       138985 (8 s)
+built in 8 s
+weggeschreven: dump/scouts_classic_k1_VV-V.u8
+verification: 0 errors (3 s)
+
+VV-V, bord classic, k = 1: 45922095 toestanden per kant aan zet (symmetrisch; volledig x4)
+alle toestanden                  rood aan zet: winst rood 100.00% remise   0.00% (n = 45922095)  blauw aan zet: winst rood 100.00% remise   0.00% (n = 45922095)
+niemand beperkt                  rood aan zet: winst rood 100.00% remise   0.00% (n = 94185)  blauw aan zet: winst rood 100.00% remise   0.00% (n = 94185)
+niemand beperkt, niet op slag    rood aan zet: winst rood 100.00% remise   0.00% (n = 65904)  blauw aan zet: winst rood 100.00% remise   0.00% (n = 65904)
+langste winst: rood aan zet 15 plies, blauw aan zet 16 plies
+langste winst zonder beperking, rood aan zet: 15 plies, rood Vg4 Vf5, blauw Va1
+    +---------------------+
+ 10 | . . . . . . . . . . |
+  9 | . . . . . . . . . . |
+  8 | . . . . . . . . . . |
+  7 | . . . . . . . . . . |
+  6 | . . ~ ~ . . ~ ~ . . |
+  5 | . . ~ ~ . V ~ ~ . . |
+  4 | . . . . . . V . . . |
+  3 | . . . . . . . . . . |
+  2 | . . . . . . . . . . |
+  1 | v . . . . . . . . . |
+    +---------------------+
+      a b c d e f g h i j   (V rood, v blauw)
+PV: 1. Vg4-h4 Va1-a2 2. Vh4-i4 Va2-a3 3. Vf5-f7 Va3-b3 4. Vi4-e4 Vb3-b8 5. Ve4-e8 Vb8-b9 6. Ve8-e9 Vb9-b10 7. Ve9-e10 Vb10-c10 8. Ve10xc10

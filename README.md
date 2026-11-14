@@ -407,6 +407,52 @@ wins (XS–E, XE–E, XE–X), except when blue to move can strike the marshal a
 2L–2S is won everywhere in at most 115 plies with red to move (L a1 b1 vs S f1 i1) and 116 with blue to move
 (L a1 b1 vs S f1 h1); see [the log](results/stratego22.log). Lower pieces never protect each other.
 
+## Scouts: VV-V with the scout two-square rule
+
+[`src/scouts_egdb.cpp`](src/scouts_egdb.cpp) solves two red scouts against one blue scout on Quick Arena (8x8, lakes
+c4 c5 f4 f5) and on the classic board. A scout slides over vacant squares and attacks from any distance, so every
+attack ends VV-V in a red win (blue can only trade, and red keeps a scout).
+
+The two-square rule is applied per boundary (ISF 10.2). The piece that moved last carries a pattern: the direction back
+along its last move, the length of that move, and for each crossed boundary the number of consecutive crossings
+(1..k). A move may not cross a boundary that is at k. Counts of boundaries the move does not cross are dropped, and
+moving the other piece starts afresh. For example, at k = 3, after a1-a5, a5-a3, a3-a7 the scout may go back to a6
+and a5, but not to a4 or a3.
+
+The index mirrors the blue scout into the quadrant and uses an offset table per placement, because the number of
+pattern states depends on the squares. The solver is a leapfrog retrograde analysis with table-driven unmoves, and every
+database passes a full Bellman check. Timings on 4 cores: Quick Arena k = 3 takes 162 s, classic k = 2 takes 155 s.
+
+| board | k | states per side to move (symmetric) | red to move wins | blue to move wins | not attacked: red / blue to move | longest win |
+|---|---|---|---|---|---|---|
+| Quick Arena | ∞ | 25,665 | 46.62% | 5.73% | 16.51% / 0% | 7 plies |
+| Quick Arena | 1 | 8,074,992 | 100% | 100% | 100% / 100% | 13 plies |
+| Quick Arena | 2 | 112,594,269 | 58.69% | 10.23% | 35.39% / 0% | 15 plies |
+| Quick Arena | 3 | 887,714,244 | 58.69% | 10.23% | 35.39% / 0% | 17 plies |
+| classic | ∞ | 94,185 | 38.40% | 3.50% | 11.96% / 0% | 7 plies |
+| classic | 1 | 45,922,095 | 100% | 100% | 100% / 100% | 15 plies |
+| classic | 2 | 862,298,685 | 39.21% | 3.73% | 13.13% / 0% | 7 plies |
+
+The win percentages are for the positions in which nobody is restricted. The longest win is over all states.
+
+- **k = 1:** everything is won. Red alternates between its two scouts, while the single blue scout may never cross
+  back over the boundary it just crossed.
+- **Strategic draws** (nobody restricted, drawn whichever side is to move):
+  - Quick Arena: 53.38% at k = ∞, 41.31% at k = 2 and 3.
+  - Classic: 61.60% at k = ∞, 60.79% at k = 2.
+  - In the open field nothing changes. The difference lies entirely in the pockets: under and above the lakes on
+    Quick Arena (c1-c3, where two scouts cannot cover three rows), and beside the lakes on both boards.
+  - The classic pocket under a lake is two files wide and stays safe.
+
+**How blue draws** ([log](results/scouts_blue_draw.log)). The rule of thumb is: move to a square no red scout sees,
+in the open field, which means not on a lake row and, on Quick Arena, not under or above a lake.
+- At k = ∞ this is a complete drawing strategy on both boards, with any choice of move. It holds every strategic
+  draw with blue to move.
+- At k = 2 and 3 a drawing choice within the rule always exists, but an arbitrary choice fails. Every losing rule move
+  crosses a boundary for the k-th time. Example on Quick Arena at k = 2, from the strategic draw Vb2 Vc2 vs Va1:
+  1. … Va1-a3 2. Vb2-b3 Va3-a1? 3. Vb3-b1, and blue is trapped in the corner with its way up closed. Avoiding the k-th
+  crossing altogether loses at k = 2 (blue then plays k = 1), but holds every strategic draw at k = 3.
+
 ## Reproducing everything
 
 ```sh
@@ -426,6 +472,9 @@ python3 scripts/ls_criterion.py dump inf 1 2 3 4 5
 ./build/stratego22 > results/stratego22.log
 ./build/stratego_egdb -k inf SS SS LL SS LS SS LL LS LS LS KS LL KS LS KL LS KL KS ML KS > results/2v2_kinf.log
 ./build/stratego_egdb -k inf X E XS E X SE XE E XE X XE SE XE XE XL SE XS LE XS SE XS XE > results/spy_marshal_kinf.log
+for k in inf 1 2 3; do ./build/scouts_egdb -board qa -k $k -verify > results/scouts_qa_k$k.log; done
+for k in inf 1 2; do ./build/scouts_egdb -board classic -k $k -verify > results/scouts_classic_k$k.log; done
+./build/scouts_egdb -board qa -k 2 -load -strategic -howdraw -rule -rulefix -rulestat -anyrule -example
 ```
 
 A material pair is given as red and blue ranks (`L S`, `KL L`, …); it is canonicalised and its sub-databases are

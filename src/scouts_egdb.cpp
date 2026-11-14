@@ -32,6 +32,7 @@
 #include <bit>
 #include <chrono>
 #include <cstdint>
+#include <cstdlib>
 #include <cstdio>
 #include <format>
 #include <iostream>
@@ -805,6 +806,138 @@ void anyrule()
         std::cout << '\n';
 }
 
+// -policy <n>: a rule for blue as a preference order on the safe open-field moves; blue picks ANY move of the best
+// tier. Greatest fixpoint as in -anyrule. Scores (higher is better):
+// 0 none, 1 no count reaches K, 2 mobility (safe open-field moves blue would have next, red unchanged),
+// 3 no count K then mobility, 4 short move (length 1), 5 not on the edge, 6 mobility then no count K,
+// 7 no count K then not on the edge, 8 not on the edge then mobility, 9 at least two exits (see exits()),
+// 10 most exits, 11 two exits then no count K, 12 at least three exits, 13 two exits then mobility
+int policy = 0;
+bool exhausts(St const& ch)
+{
+        if (unlimited()) { return false; }
+        auto const k = pats[ch.b][ch.bq];
+        for (auto i = 0; i < klen(k); ++i) { if (kcnt(k, i) >= K) { return true; } }
+        return false;
+}
+int mobility(St const& ch)
+{
+        auto q = ch;
+        q.stm = 1;
+        auto n = 0;
+        for_each_move(q, [&](St const& c2, bool cap) { if (!cap && !in_line(c2) && open_field(c2.b)) { ++n; } });
+        return n;
+}
+// exits after a blue move: directions with an empty neighbour square whose boundary blue may still cross
+int exits(St const& ch)
+{
+        auto n = 0;
+        for (auto d = 0; d < 4; ++d) {
+                if (ray[ch.b][d].empty()) { continue; }
+                auto const y = ray[ch.b][d][0];
+                if (y == ch.r[0] || y == ch.r[1]) { continue; }
+                if (!unlimited() && trans_of(ch.b, ch.bq, d, 1) < 0) { continue; }
+                ++n;
+        }
+        return n;
+}
+long score(St const& s, St const& ch)
+{
+        auto const nx = exhausts(ch) ? 0 : 1;
+        auto const edge = fo[ch.b] == 0 || fo[ch.b] == W - 1 || ro[ch.b] == 0 || ro[ch.b] == H - 1 ? 0 : 1;
+        auto const len = std::abs(fo[ch.b] - fo[s.b]) + std::abs(ro[ch.b] - ro[s.b]);
+        switch (policy) {
+        case 1: return nx;
+        case 2: return mobility(ch);
+        case 3: return nx * 100 + mobility(ch);
+        case 4: return len == 1;
+        case 5: return edge;
+        case 6: return mobility(ch) * 2 + nx;
+        case 7: return nx * 2 + edge;
+        case 8: return edge * 100 + mobility(ch);
+        case 9: return exits(ch) >= 2;
+        case 10: return exits(ch);
+        case 11: return (exits(ch) >= 2) * 2 + nx;
+        case 12: return exits(ch) >= 3;
+        case 13: return (exits(ch) >= 2) * 1000 + mobility(ch);
+        default: return 0;
+        }
+}
+void policy_test()
+{
+        std::array<std::vector<std::uint8_t>, 2> ok;
+        for (auto stm = 0; stm < 2; ++stm) { ok[stm].resize(S); for (std::uint64_t i = 0; i < S; ++i) { ok[stm][i] = val[stm][i] == UNK; } }
+        auto passes = 0;
+        for (;; ++passes) {
+                std::atomic<std::uint64_t> changed{ 0 };
+                for_each_state(1, [&](std::uint64_t idx, St const& s) {
+                        if (!ok[1][idx]) { return; }
+                        long best = -1;
+                        auto good = true;
+                        for_each_move(s, [&](St const& ch, bool cap) {
+                                if (cap || in_line(ch) || !open_field(ch.b)) { return; }
+                                auto const sc = score(s, ch);
+                                auto const g = ld(ok[0][encode(ch)]) != 0;
+                                if (sc > best) { best = sc; good = g; } else if (sc == best) { good = good && g; }
+                        });
+                        if (best < 0 || !good) { std::atomic_ref<std::uint8_t>(ok[1][idx]).store(0, std::memory_order_relaxed); ++changed; }
+                });
+                for_each_state(0, [&](std::uint64_t idx, St const& s) {
+                        if (!ok[0][idx]) { return; }
+                        auto good = true;
+                        for_each_move(s, [&](St const& ch, bool cap) { if (good && (cap || !ld(ok[1][encode(ch)]))) { good = false; } });
+                        if (!good) { std::atomic_ref<std::uint8_t>(ok[0][idx]).store(0, std::memory_order_relaxed); ++changed; }
+                });
+                if (changed == 0) { break; }
+        }
+        std::uint64_t sd = 0, skb = 0, skr = 0, onb = 0, okb = 0;
+        for (std::uint64_t pl = 0; pl < NPL; ++pl) {
+                auto const i = off[pl];
+                if (val[0][i] != UNK || val[1][i] != UNK) { continue; }
+                ++sd; skb += ok[1][i]; skr += ok[0][i];
+                if (open_field(placement(pl).b)) { ++onb; okb += ok[1][i]; }
+        }
+        std::cout << std::format("regel {}: strategische remises gehouden, blauw aan zet {} van {} (blauw in het open veld: {} van {}), rood aan zet {}; {} passes\n",
+                policy, skb, sd, okb, onb, skr, passes);
+}
+
+// -example: a strategic draw (blue to move), a drawing blue move, a red reply, then a safe open-field blue move back
+// over the same boundary that loses; printed with the main line
+void example()
+{
+        auto const mv = [](St const& a, St const& b, int me) {
+                auto const from = me == 0 ? (a.r[0] != b.r[0] ? a.r[0] : a.r[1]) : a.b;
+                auto const to = me == 0 ? (a.r[0] != b.r[0] ? b.r[0] : b.r[1]) : b.b;
+                return std::format("V{}-{}", nm(from), nm(to));
+        };
+        for (std::uint64_t pl = 0; pl < NPL; ++pl) {
+                auto const i = off[pl];
+                if (val[0][i] != UNK || val[1][i] != UNK) { continue; }
+                auto const s0 = make_state(placement(pl), 0, 0, 1);
+                if (!open_field(s0.b) || in_line(s0)) { continue; }
+                auto found = false;
+                for_each_move(s0, [&](St const& s1, bool c1) {
+                        if (found || c1 || in_line(s1) || !open_field(s1.b) || value(s1) != UNK) { return; }
+                        for_each_move(s1, [&](St const& s2, bool c2) {
+                                if (found || c2 || value(s2) != UNK) { return; }
+                                for_each_move(s2, [&](St const& s3, bool c3) {
+                                        if (found || c3 || in_line(s3) || !open_field(s3.b) || !exhausts(s3) || value(s3) == UNK) { return; }
+                                        found = true;
+                                        std::cout << std::format("\nvoorbeeld: rood V{} V{}, blauw V{}, blauw aan zet (strategische remise)\n", nm(s0.r[0]), nm(s0.r[1]), nm(s0.b));
+                                        diagram(s0);
+                                        std::cout << std::format("1. \u2026 {} 2. {} {}? ({}; remise was o.a. ", mv(s0, s1, 1), mv(s1, s2, 0), mv(s2, s3, 1), value_text(s3) == "remise" ? "" : "verliest");
+                                        auto shown = 0;
+                                        for_each_move(s2, [&](St const& alt, bool ca) { if (!ca && value(alt) == UNK && shown < 3) { std::cout << (shown++ ? ", " : "") << mv(s2, alt, 1); } });
+                                        std::cout << ")\nna de fout:\n";
+                                        diagram(s3);
+                                        pv(s3);
+                                });
+                        });
+                });
+                if (found) { return; }
+        }
+}
+
 std::string dump_name() { return std::format("dump/scouts_{}_k{}_VV-V.u8", board, kname()); }
 
 void save()
@@ -840,7 +973,7 @@ int square(std::string const& s)
 int main(int argc, char* argv[])
 {
         try {
-                auto do_load = false, do_verify = false, do_strategic = false, do_howdraw = false, do_rule = false, do_rulefix = false, do_rulestat = false, do_anyrule = false;
+                auto do_load = false, do_verify = false, do_strategic = false, do_howdraw = false, do_rule = false, do_rulefix = false, do_rulestat = false, do_anyrule = false, do_policy = false, do_example = false;
                 std::vector<std::string> pos;
                 for (auto i = 1; i < argc; ++i) {
                         std::string const a = argv[i];
@@ -854,6 +987,8 @@ int main(int argc, char* argv[])
                         else if (a == "-rulefix") { do_rulefix = true; }
                         else if (a == "-rulestat") { do_rulestat = true; }
                         else if (a == "-anyrule") { do_anyrule = true; }
+                        else if (a == "-example") { do_example = true; }
+                        else if (a == "-policy") { do_policy = true; policy = std::stoi(argv[++i]); }
                         else if (a == "-pos") { pos = { argv[i + 1], argv[i + 2], argv[i + 3] }; i += 3; }
                         else { throw std::invalid_argument(a); }
                 }
@@ -871,6 +1006,8 @@ int main(int argc, char* argv[])
                 if (do_rulefix) { rulefix(); }
                 if (do_rulestat) { rulestat(); }
                 if (do_anyrule) { anyrule(); }
+                if (do_policy) { policy_test(); }
+                if (do_example) { example(); }
                 if (!pos.empty()) {
                         St s;
                         auto const rs = pos[0];

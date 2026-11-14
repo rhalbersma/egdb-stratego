@@ -1,0 +1,28 @@
+bord qa (60 velden), k = inf: patronen per veld max 0, 25665 plaatsingen, 25665 toestanden per kant aan zet, 0.00 GB
+seeds: 9255 red wins in 1, 0 blue without a move (0 s)
+level   1: red wins         9255 blue losses          651 (0 s)
+level   2: red wins          765 blue losses          765 (0 s)
+level   3: red wins         1836 blue losses           54 (0 s)
+level   4: red wins          108 blue losses            0 (0 s)
+built in 0 s
+weggeschreven: dump/scouts_qa_kinf_VV-V.u8
+verification: 0 errors (0 s)
+
+VV-V, bord qa, k = inf: 25665 toestanden per kant aan zet (symmetrisch; volledig x4)
+alle toestanden                  rood aan zet: winst rood  46.62% remise  53.38% (n = 25665)  blauw aan zet: winst rood   5.73% remise  94.27% (n = 25665)
+niemand beperkt                  rood aan zet: winst rood  46.62% remise  53.38% (n = 25665)  blauw aan zet: winst rood   5.73% remise  94.27% (n = 25665)
+niemand beperkt, niet op slag    rood aan zet: winst rood  16.51% remise  83.49% (n = 16410)  blauw aan zet: winst rood   0.00% remise 100.00% (n = 16410)
+langste winst: rood aan zet 7 plies, blauw aan zet 6 plies
+langste winst zonder beperking, rood aan zet: 7 plies, rood Vc1 Vd1, blauw Vb4
+    +-----------------+
+  8 | . . . . . . . . |
+  7 | . . . . . . . . |
+  6 | . . . . . . . . |
+  5 | . . ~ . . ~ . . |
+  4 | . v ~ . . ~ . . |
+  3 | . . . . . . . . |
+  2 | . . . . . . . . |
+  1 | . . V V . . . . |
+    +-----------------+
+      a b c d e f g h   (V rood, v blauw)
+PV: 1. Vc1-b1 Vb4-a4 2. Vb1-a1 Va4-b4 3. Vd1-b1 Vb4-b5 4. Vb1xb5
