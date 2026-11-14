@@ -811,8 +811,12 @@ void anyrule()
 // 0 none, 1 no count reaches K, 2 mobility (safe open-field moves blue would have next, red unchanged),
 // 3 no count K then mobility, 4 short move (length 1), 5 not on the edge, 6 mobility then no count K,
 // 7 no count K then not on the edge, 8 not on the edge then mobility, 9 at least two exits (see exits()),
-// 10 most exits, 11 two exits then no count K, 12 at least three exits, 13 two exits then mobility
+// 10 most exits, 11 two exits then no count K, 12 at least three exits, 13 two exits then mobility,
+// 14 after every red reply blue still has a safe open-field move, 15 the same, then no count K,
+// 16 as 14 on the whole board (safe squares anywhere, no open-field condition)
 int policy = 0;
+inline bool region(int x) { return policy == 16 || open_field(x); }     // policy 16 drops the open-field condition
+std::vector<std::uint8_t> escape_red;          // policy 14: after every red move blue still has a safe open-field move
 bool exhausts(St const& ch)
 {
         if (unlimited()) { return false; }
@@ -860,11 +864,30 @@ long score(St const& s, St const& ch)
         case 11: return (exits(ch) >= 2) * 2 + nx;
         case 12: return exits(ch) >= 3;
         case 13: return (exits(ch) >= 2) * 1000 + mobility(ch);
+        case 14: return escape_red[encode(ch)];
+        case 15: return escape_red[encode(ch)] * 2 + nx;
+        case 16: return escape_red[encode(ch)];
         default: return 0;
         }
 }
+void init_escape()
+{
+        std::vector<std::uint8_t> eb(S);
+        for_each_state(1, [&](std::uint64_t idx, St const& s) {
+                auto e = false;
+                for_each_move(s, [&](St const& ch, bool cap) { e = e || (!cap && !in_line(ch) && region(ch.b)); });
+                eb[idx] = e;
+        });
+        escape_red.assign(S, 0);
+        for_each_state(0, [&](std::uint64_t idx, St const& s) {
+                auto e = true;
+                for_each_move(s, [&](St const& ch, bool cap) { e = e && !cap && eb[encode(ch)]; });
+                escape_red[idx] = e;
+        });
+}
 void policy_test()
 {
+        if (policy >= 14 && escape_red.empty()) { init_escape(); }
         std::array<std::vector<std::uint8_t>, 2> ok;
         for (auto stm = 0; stm < 2; ++stm) { ok[stm].resize(S); for (std::uint64_t i = 0; i < S; ++i) { ok[stm][i] = val[stm][i] == UNK; } }
         auto passes = 0;
@@ -875,7 +898,7 @@ void policy_test()
                         long best = -1;
                         auto good = true;
                         for_each_move(s, [&](St const& ch, bool cap) {
-                                if (cap || in_line(ch) || !open_field(ch.b)) { return; }
+                                if (cap || in_line(ch) || !region(ch.b)) { return; }
                                 auto const sc = score(s, ch);
                                 auto const g = ld(ok[0][encode(ch)]) != 0;
                                 if (sc > best) { best = sc; good = g; } else if (sc == best) { good = good && g; }
