@@ -16,8 +16,10 @@ find_package(OpenMP REQUIRED)
 add_executable(stratego_egdb src/stratego_egdb.cpp)
 # 2 lieutenants vs 1 and 2 sergeants without the tweeveldenregel (4 pieces)
 add_executable(stratego22 src/stratego22.cpp)
+# two scouts vs one scout (VV-V) with the scout two-square rule per boundary, Quick Arena or classic board
+add_executable(scouts_egdb src/scouts_egdb.cpp)
 
-foreach(target stratego_egdb stratego22)
+foreach(target stratego_egdb stratego22 scouts_egdb)
     target_link_libraries(${target} PRIVATE OpenMP::OpenMP_CXX)
     target_compile_features(${target} PRIVATE cxx_std_23)
     target_compile_options(${target} PRIVATE $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall -Wextra -march=native>)
