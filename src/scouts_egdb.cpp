@@ -581,6 +581,28 @@ void report()
         }
 }
 
+// -strategic: the positions with nobody restricted that are drawn whichever side is to move, per blue square
+void strategic()
+{
+        std::uint64_t n = 0, shown = 0;
+        std::vector<std::uint64_t> per_blue(N, 0), per_red(N, 0);
+        for (std::uint64_t pl = 0; pl < NPL; ++pl) {
+                if (val[0][off[pl]] != UNK || val[1][off[pl]] != UNK) { continue; }
+                auto const p = placement(pl);
+                ++n; ++per_blue[p.b]; ++per_red[p.r0]; ++per_red[p.r1];
+                if (shown < 3) {
+                        ++shown;
+                        auto const st = make_state(p, 0, 0, 0);
+                        std::cout << std::format("\nstrategische remise: rood V{} V{}, blauw V{}\n", nm(p.r0), nm(p.r1), nm(p.b));
+                        diagram(st);
+                }
+        }
+        std::cout << std::format("\nstrategische remises (niemand beperkt, remise met rood en met blauw aan zet): {} van {} plaatsingen ({:.2f}%)\n", n, NPL, 100.0 * double(n) / double(NPL));
+        std::cout << "per veld van de blauwe verkenner (kwadrant):\n";
+        for (auto x : qsq) { std::cout << std::format("  {}: {}", nm(x), per_blue[x]); }
+        std::cout << '\n';
+}
+
 std::string dump_name() { return std::format("dump/scouts_{}_k{}_VV-V.u8", board, kname()); }
 
 void save()
@@ -616,7 +638,7 @@ int square(std::string const& s)
 int main(int argc, char* argv[])
 {
         try {
-                auto do_load = false, do_verify = false;
+                auto do_load = false, do_verify = false, do_strategic = false;
                 std::vector<std::string> pos;
                 for (auto i = 1; i < argc; ++i) {
                         std::string const a = argv[i];
@@ -624,6 +646,7 @@ int main(int argc, char* argv[])
                         else if (a == "-k") { std::string const v = argv[++i]; K = v == "inf" ? 0 : std::stoi(v); if (K < 0 || K > 3) { throw std::invalid_argument("k"); } }
                         else if (a == "-load") { do_load = true; }
                         else if (a == "-verify") { do_verify = true; }
+                        else if (a == "-strategic") { do_strategic = true; }
                         else if (a == "-pos") { pos = { argv[i + 1], argv[i + 2], argv[i + 3] }; i += 3; }
                         else { throw std::invalid_argument(a); }
                 }
@@ -635,6 +658,7 @@ int main(int argc, char* argv[])
                 if (do_load && load()) { std::cout << "geladen: " << dump_name() << '\n'; } else { build(); save(); }
                 if (do_verify) { verify(); }
                 report();
+                if (do_strategic) { strategic(); }
                 if (!pos.empty()) {
                         St s;
                         auto const rs = pos[0];
