@@ -1,0 +1,29 @@
+# -policy 14: safe square, open field, and after every red move still a safe open-field square (blue may pick any such move)
+qa k=3: regel 14: strategische remises gehouden, blauw aan zet 10602 van 10602 (blauw in het open veld: 8910 van 8910), rood aan zet 9039; 1 passes (304 s)
+classic k=2: regel 14: strategische remises gehouden, blauw aan zet 57252 van 57252 (blauw in het open veld: 56184 van 56184), rood aan zet 56268; 1 passes (398 s)
+qa k=inf: regel 14: strategische remises gehouden, blauw aan zet 13701 van 13701 (blauw in het open veld: 8910 van 8910), rood aan zet 9039; 1 passes (0 s)
+classic k=inf: regel 14: strategische remises gehouden, blauw aan zet 58020 van 58020 (blauw in het open veld: 56184 van 56184), rood aan zet 56268; 1 passes (0 s)
+
+# QA k=2, other rules (blue picks any move of the best tier)
+regel 1: strategische remises gehouden, blauw aan zet 0 van 10602 (blauw in het open veld: 0 van 8910), rood aan zet 0; 5 passes (40 s)
+regel 4: strategische remises gehouden, blauw aan zet 0 van 10602 (blauw in het open veld: 0 van 8910), rood aan zet 0; 5 passes (41 s)
+regel 5: strategische remises gehouden, blauw aan zet 0 van 10602 (blauw in het open veld: 0 van 8910), rood aan zet 0; 5 passes (53 s)
+regel 7: strategische remises gehouden, blauw aan zet 0 van 10602 (blauw in het open veld: 0 van 8910), rood aan zet 0; 6 passes (73 s)
+
+regel 10: strategische remises gehouden, blauw aan zet 0 van 10602 (blauw in het open veld: 0 van 8910), rood aan zet 0; 6 passes (84 s)
+regel 9 (twee uitgangen) en regel 11: 0 van 10602 (zie monitor); regel 14 (qa k=2): 10602 van 10602; regel 16 (zonder open veld): qa k=inf 0 van 13701, qa k=2 0 van 10602
+
+# rule fixpoints
+=== qa k=3
+vuistregel 1 als enige strategie: strategische remises gehouden: rood aan zet 9039 / blauw aan zet 10602 / beide 9039 van 10602; alle remises blauw aan zet: 99.315%
+vuistregel 2 als enige strategie: strategische remises gehouden: rood aan zet 9039 / blauw aan zet 10602 / beide 9039 van 10602; alle remises blauw aan zet: 98.582%
+=== classic k=2
+=== classic k=2 rulefix
+vuistregel 1 als enige strategie: strategische remises gehouden: rood aan zet 56268 / blauw aan zet 57252 / beide 56268 van 57252; alle remises blauw aan zet: 99.674%
+vuistregel 2 als enige strategie: strategische remises gehouden: rood aan zet 0 / blauw aan zet 0 / beide 0 van 57252; alle remises blauw aan zet: 0.000%
+=== qa k=3 anyrule
+willekeurige regelzet (eerst zonder telling K): strategische remises gehouden: rood aan zet 0 / blauw aan zet 0 van 10602
+niet gehouden met blauw aan zet, per blauw veld: a1:990 b1:990 c1:406 d1:990 a2:990 b2:990 c2:316 d2:990 a3:990 b3:990 c3:286 d3:990 a4:372 b4:84 d4:228
+=== classic k=2 anyrule
+willekeurige regelzet (eerst zonder telling K): strategische remises gehouden: rood aan zet 0 / blauw aan zet 0 van 57252
+niet gehouden met blauw aan zet, per blauw veld: a1:2628 b1:2628 c1:3081 d1:3081 e1:2628 a2:2628 b2:2628 c2:3081 d2:3081 e2:2628 a3:2628 b3:2628 c3:3081 d3:3081 e3:2628 a4:2628 b4:2628 c4:3081 d4:3081 e4:2628 a5:612 b5:100 e5:356

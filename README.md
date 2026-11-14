@@ -451,7 +451,16 @@ in the open field, which means not on a lake row and, on Quick Arena, not under 
 - At k = 2 and 3 a drawing choice within the rule always exists, but an arbitrary choice fails. Every losing rule move
   crosses a boundary for the k-th time. Example on Quick Arena at k = 2, from the strategic draw Vb2 Vc2 vs Va1:
   1. … Va1-a3 2. Vb2-b3 Va3-a1? 3. Vb3-b1, and blue is trapped in the corner with its way up closed. Avoiding the k-th
-  crossing altogether loses at k = 2 (blue then plays k = 1), but holds every strategic draw at k = 3.
+  crossing altogether loses at k = 2 (blue then plays k = 1).
+- The rule that works for every k ([log](results/scouts_blue_rule.log), `-policy 14`) is: go to a square that no red
+  scout sees, in the open field, from which **after every red move blue still has such a square to go to**. Boundaries
+  blue may no longer cross do not count as a way out. With any choice among these moves, it holds every strategic draw
+  with blue to move:
+  - Quick Arena: 13,701 of 13,701 at k = ∞, 10,602 of 10,602 at k = 2 and at k = 3.
+  - Classic: 58,020 of 58,020 at k = ∞, 57,252 of 57,252 at k = 2.
+- Both parts are needed. Without the open-field condition the look-ahead fails even at k = ∞ (0 held), and without the
+  look-ahead every tested preference fails at k = 2: avoiding the k-th crossing, short moves, staying off the edge,
+  most exits, most mobility (all 0 held).
 
 ## Reproducing everything
 
@@ -475,6 +484,7 @@ python3 scripts/ls_criterion.py dump inf 1 2 3 4 5
 for k in inf 1 2 3; do ./build/scouts_egdb -board qa -k $k -verify > results/scouts_qa_k$k.log; done
 for k in inf 1 2; do ./build/scouts_egdb -board classic -k $k -verify > results/scouts_classic_k$k.log; done
 ./build/scouts_egdb -board qa -k 2 -load -strategic -howdraw -rule -rulefix -rulestat -anyrule -example
+./build/scouts_egdb -board qa -k 2 -load -policy 14   # the escape rule for blue
 ```
 
 A material pair is given as red and blue ranks (`L S`, `KL L`, …); it is canonicalised and its sub-databases are
