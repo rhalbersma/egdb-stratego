@@ -603,6 +603,208 @@ void strategic()
         std::cout << '\n';
 }
 
+// -howdraw: in every drawn state with blue to move, which blue moves keep the draw? A move is safe if the blue scout
+// lands on a square that no red scout sees along a vacant line. Counts per state and, per destination square (folded
+// into the quadrant), how often a safe move there loses.
+void howdraw()
+{
+        auto const fold = [](int x) { auto const t = (fo[x] >= W / 2 ? 1 : 0) | (ro[x] >= H / 2 ? 2 : 0); return msq[t][x]; };
+        for (auto g = 0; g < 2; ++g) {
+                std::array<std::atomic<std::uint64_t>, 6> c{};    // states, all safe hold, some safe lose, no safe draw, safe moves, safe draws
+                std::vector<std::atomic<std::uint64_t>> safe_to(N), lose_to(N);
+                for_each_state(1, [&](std::uint64_t idx, St const& s) {
+                        if (val[1][idx] != UNK || (g == 1 && (s.rp >= 0 || s.bq >= 0))) { return; }
+                        auto ns = 0, nsd = 0, nsl = 0;
+                        for_each_move(s, [&](St const& ch, bool cap) {
+                                if (cap || in_line(ch)) { return; }
+                                ++ns;
+                                auto const y = fold(ch.b);
+                                ++safe_to[y];
+                                if (val[0][encode(ch)] == UNK) { ++nsd; } else { ++nsl; ++lose_to[y]; }
+                        });
+                        ++c[0];
+                        if (nsl == 0) { ++c[1]; } else { ++c[2]; }
+                        if (nsd == 0) { ++c[3]; }
+                        c[4] += std::uint64_t(ns); c[5] += std::uint64_t(nsd);
+                });
+                std::cout << std::format("\n{}: {} remisestellingen met blauw aan zet\n", g == 0 ? "alle toestanden" : "niemand beperkt", c[0].load());
+                std::cout << std::format("  elke veilige zet houdt remise: {:.2f}%, minstens een veilige zet verliest: {:.2f}%, remise alleen via een onveilige zet: {:.4f}%\n",
+                        100.0 * double(c[1]) / double(c[0]), 100.0 * double(c[2]) / double(c[0]), 100.0 * double(c[3]) / double(c[0]));
+                std::cout << std::format("  gemiddeld {:.1f} veilige zetten, waarvan {:.1f} remise houden\n", double(c[4]) / double(c[0]), double(c[5]) / double(c[0]));
+                std::cout << "  verliezende veilige zetten per doelveld (% van de veilige zetten naar dat veld, gevouwen naar het kwadrant):\n";
+                for (auto r = H / 2 - 1; r >= 0; --r) {
+                        std::cout << "   ";
+                        for (auto f = 0; f < W / 2; ++f) {
+                                auto const x = grid[f][r];
+                                if (x < 0) { std::cout << "     ~"; continue; }
+                                std::cout << std::format(" {:5.1f}", safe_to[x] == 0 ? 0.0 : 100.0 * double(lose_to[x]) / double(safe_to[x]));
+                        }
+                        std::cout << '\n';
+                }
+        }
+}
+
+// -rule: test the rule of thumb for blue: move to a safe square (no red scout sees it) in the open field: not on a lake
+// row and, on Quick Arena, not under or above a lake; variant 2 also never makes a move that brings a boundary count
+// to K (blue keeps its way back open).
+bool open_field(int x)
+{
+        auto const lake_row = board == "qa" ? (ro[x] == 3 || ro[x] == 4) : (ro[x] == 4 || ro[x] == 5);
+        auto const pocket = board == "qa" && (fo[x] == 2 || fo[x] == 5);
+        return !lake_row && !pocket;
+}
+void rule()
+{
+        for (auto v = 1; v <= 2; ++v) {
+                std::array<std::atomic<std::uint64_t>, 6> c{};    // drawn states, a rule move exists, every rule move holds, a rule move holds; the same two for blue in the open field
+                for_each_state(1, [&](std::uint64_t idx, St const& s) {
+                        if (val[1][idx] != UNK) { return; }
+                        auto inside = open_field(s.b);          // blue already follows the rule: open field, no count at K
+                        if (inside && v == 2 && !unlimited() && s.bq >= 0) {
+                                auto const k = pats[s.b][s.bq];
+                                for (auto i = 0; i < klen(k); ++i) { if (kcnt(k, i) >= K) { inside = false; } }
+                        }
+                        auto n = 0, hold = 0;
+                        for_each_move(s, [&](St const& ch, bool cap) {
+                                if (cap || in_line(ch) || !open_field(ch.b)) { return; }
+                                if (v == 2 && !unlimited()) {
+                                        auto const k = pats[ch.b][ch.bq];
+                                        for (auto i = 0; i < klen(k); ++i) { if (kcnt(k, i) >= K) { return; } }
+                                }
+                                ++n;
+                                if (val[0][encode(ch)] == UNK) { ++hold; }
+                        });
+                        ++c[0];
+                        if (n > 0) { ++c[1]; }
+                        if (n > 0 && hold == n) { ++c[2]; }
+                        if (hold > 0) { ++c[3]; }
+                        if (inside) { ++c[4]; if (n > 0 && hold == n) { ++c[5]; } }
+                });
+                auto const pct = [&](int i) { return 100.0 * double(c[i]) / double(c[0]); };
+                std::cout << std::format("vuistregel {}: {} remisestellingen (blauw aan zet): regelzet bestaat {:.3f}%, elke regelzet houdt remise {:.3f}%, een regelzet houdt remise {:.3f}%\n",
+                        v, c[0].load(), pct(1), pct(2), pct(3));
+                std::cout << std::format("  blauw staat al volgens de regel: {} stellingen, regelzet bestaat en elke regelzet houdt remise: {:.4f}%\n", c[4].load(), 100.0 * double(c[5]) / double(c[4]));
+        }
+}
+
+// -rulefix: can blue hold the draw with rule moves only? Greatest fixpoint: a blue state is kept if it is drawn and
+// has a rule move to a kept red state; a red state is kept if it is drawn and every red move leads to a kept blue state.
+void rulefix()
+{
+        for (auto v = 1; v <= 2; ++v) {
+                std::array<std::vector<std::uint8_t>, 2> ok;
+                for (auto stm = 0; stm < 2; ++stm) { ok[stm].resize(S); for (std::uint64_t i = 0; i < S; ++i) { ok[stm][i] = val[stm][i] == UNK; } }
+                auto const rule_move = [&](St const& ch) {
+                        if (in_line(ch) || !open_field(ch.b)) { return false; }
+                        if (v == 2 && !unlimited()) { auto const k = pats[ch.b][ch.bq]; for (auto i = 0; i < klen(k); ++i) { if (kcnt(k, i) >= K) { return false; } } }
+                        return true;
+                };
+                for (auto pass = 1; ; ++pass) {
+                        std::atomic<std::uint64_t> changed{ 0 };
+                        for_each_state(1, [&](std::uint64_t idx, St const& s) {
+                                if (!ok[1][idx]) { return; }
+                                auto good = false;
+                                for_each_move(s, [&](St const& ch, bool cap) { if (!good && !cap && rule_move(ch) && ld(ok[0][encode(ch)])) { good = true; } });
+                                if (!good) { std::atomic_ref<std::uint8_t>(ok[1][idx]).store(0, std::memory_order_relaxed); ++changed; }
+                        });
+                        for_each_state(0, [&](std::uint64_t idx, St const& s) {
+                                if (!ok[0][idx]) { return; }
+                                auto good = true;
+                                for_each_move(s, [&](St const& ch, bool cap) { if (good && (cap || !ld(ok[1][encode(ch)]))) { good = false; } });
+                                if (!good) { std::atomic_ref<std::uint8_t>(ok[0][idx]).store(0, std::memory_order_relaxed); ++changed; }
+                        });
+                        if (changed == 0) { break; }
+                        if (pass > 1000) { throw std::runtime_error("rulefix"); }
+                }
+                std::uint64_t sd = 0, sk = 0, skr = 0, skb = 0;
+                for (std::uint64_t pl = 0; pl < NPL; ++pl) {
+                        auto const i = off[pl];
+                        if (val[0][i] != UNK || val[1][i] != UNK) { continue; }
+                        ++sd;
+                        skr += ok[0][i]; skb += ok[1][i]; sk += ok[0][i] && ok[1][i];
+                }
+                std::uint64_t db = 0, kb = 0;
+                for (std::uint64_t i = 0; i < S; ++i) { if (val[1][i] == UNK) { ++db; kb += ok[1][i]; } }
+                std::cout << std::format("vuistregel {} als enige strategie: strategische remises gehouden: rood aan zet {} / blauw aan zet {} / beide {} van {}; alle remises blauw aan zet: {:.3f}%\n",
+                        v, skr, skb, sk, sd, 100.0 * double(kb) / double(db));
+        }
+}
+
+// -rulestat: the rule moves (safe, open field) from drawn blue states with blue in the open field that lose, split by
+// whether the move brings a boundary count to K and by the length of the move
+void rulestat()
+{
+        std::array<std::array<std::atomic<std::uint64_t>, 2>, 2> c{};   // [count reaches K][loses]
+        std::array<std::array<std::atomic<std::uint64_t>, 2>, 12> bylen{};
+        std::array<std::array<std::atomic<std::uint64_t>, 2>, 2> inl{};  // [blue was attacked][loses]
+        for_each_state(1, [&](std::uint64_t idx, St const& s) {
+                if (val[1][idx] != UNK || !open_field(s.b)) { return; }
+                auto const att = in_line(s);
+                for_each_move(s, [&](St const& ch, bool cap) {
+                        if (cap || in_line(ch) || !open_field(ch.b)) { return; }
+                        auto full = false;
+                        auto len = 0;
+                        if (!unlimited()) { auto const k = pats[ch.b][ch.bq]; len = klen(k); for (auto i = 0; i < len; ++i) { full = full || kcnt(k, i) >= K; } }
+                        auto const lose = val[0][encode(ch)] != UNK;
+                        ++c[full][lose]; ++bylen[len][lose]; ++inl[att][lose];
+                });
+        });
+        auto const pct = [](auto const& a) { return 100.0 * double(a[1]) / double(a[0] + a[1]); };
+        std::cout << std::format("regelzetten uit het open veld: telling bereikt K: {} zetten, {:.2f}% verliest; anders: {} zetten, {:.2f}% verliest\n",
+                c[1][0] + c[1][1], pct(c[1]), c[0][0] + c[0][1], pct(c[0]));
+        std::cout << std::format("blauw stond op slag: {:.2f}% verliest ({} zetten); niet op slag: {:.2f}% verliest ({} zetten)\n", pct(inl[1]), inl[1][0] + inl[1][1], pct(inl[0]), inl[0][0] + inl[0][1]);
+        for (auto l = 1; l < 12; ++l) { if (bylen[l][0] + bylen[l][1] > 0) { std::cout << std::format("  lengte {}: {:.2f}% verliest\n", l, pct(bylen[l])); } }
+}
+
+// -anyrule: the rule as a strategy with an arbitrary choice: blue plays any safe open-field move that brings no boundary
+// count to K, and only when there is none, any safe open-field move. Greatest fixpoint in which EVERY allowed move must
+// lead to a kept red state.
+void anyrule()
+{
+        std::array<std::vector<std::uint8_t>, 2> ok;
+        for (auto stm = 0; stm < 2; ++stm) { ok[stm].resize(S); for (std::uint64_t i = 0; i < S; ++i) { ok[stm][i] = val[stm][i] == UNK; } }
+        auto const full = [&](St const& ch) {
+                if (unlimited()) { return false; }
+                auto const k = pats[ch.b][ch.bq];
+                for (auto i = 0; i < klen(k); ++i) { if (kcnt(k, i) >= K) { return true; } }
+                return false;
+        };
+        for (auto pass = 1; ; ++pass) {
+                std::atomic<std::uint64_t> changed{ 0 };
+                for_each_state(1, [&](std::uint64_t idx, St const& s) {
+                        if (!ok[1][idx]) { return; }
+                        std::array<int, 2> n{}, good{};             // [count reaches K]
+                        for_each_move(s, [&](St const& ch, bool cap) {
+                                if (cap || in_line(ch) || !open_field(ch.b)) { return; }
+                                auto const f = full(ch);
+                                ++n[f];
+                                if (ld(ok[0][encode(ch)])) { ++good[f]; }
+                        });
+                        auto const g = n[0] > 0 ? good[0] == n[0] : n[1] > 0 && good[1] == n[1];
+                        if (!g) { std::atomic_ref<std::uint8_t>(ok[1][idx]).store(0, std::memory_order_relaxed); ++changed; }
+                });
+                for_each_state(0, [&](std::uint64_t idx, St const& s) {
+                        if (!ok[0][idx]) { return; }
+                        auto good = true;
+                        for_each_move(s, [&](St const& ch, bool cap) { if (good && (cap || !ld(ok[1][encode(ch)]))) { good = false; } });
+                        if (!good) { std::atomic_ref<std::uint8_t>(ok[0][idx]).store(0, std::memory_order_relaxed); ++changed; }
+                });
+                if (changed == 0) { break; }
+        }
+        std::uint64_t sd = 0, skr = 0, skb = 0;
+        std::vector<std::uint64_t> lostb(N, 0);
+        for (std::uint64_t pl = 0; pl < NPL; ++pl) {
+                auto const i = off[pl];
+                if (val[0][i] != UNK || val[1][i] != UNK) { continue; }
+                ++sd; skr += ok[0][i]; skb += ok[1][i];
+                if (!ok[1][i]) { ++lostb[placement(pl).b]; }
+        }
+        std::cout << std::format("willekeurige regelzet (eerst zonder telling K): strategische remises gehouden: rood aan zet {} / blauw aan zet {} van {}\n", skr, skb, sd);
+        std::cout << "niet gehouden met blauw aan zet, per blauw veld:";
+        for (auto x : qsq) { if (lostb[x]) { std::cout << std::format(" {}:{}", nm(x), lostb[x]); } }
+        std::cout << '\n';
+}
+
 std::string dump_name() { return std::format("dump/scouts_{}_k{}_VV-V.u8", board, kname()); }
 
 void save()
@@ -638,7 +840,7 @@ int square(std::string const& s)
 int main(int argc, char* argv[])
 {
         try {
-                auto do_load = false, do_verify = false, do_strategic = false;
+                auto do_load = false, do_verify = false, do_strategic = false, do_howdraw = false, do_rule = false, do_rulefix = false, do_rulestat = false, do_anyrule = false;
                 std::vector<std::string> pos;
                 for (auto i = 1; i < argc; ++i) {
                         std::string const a = argv[i];
@@ -647,6 +849,11 @@ int main(int argc, char* argv[])
                         else if (a == "-load") { do_load = true; }
                         else if (a == "-verify") { do_verify = true; }
                         else if (a == "-strategic") { do_strategic = true; }
+                        else if (a == "-howdraw") { do_howdraw = true; }
+                        else if (a == "-rule") { do_rule = true; }
+                        else if (a == "-rulefix") { do_rulefix = true; }
+                        else if (a == "-rulestat") { do_rulestat = true; }
+                        else if (a == "-anyrule") { do_anyrule = true; }
                         else if (a == "-pos") { pos = { argv[i + 1], argv[i + 2], argv[i + 3] }; i += 3; }
                         else { throw std::invalid_argument(a); }
                 }
@@ -659,6 +866,11 @@ int main(int argc, char* argv[])
                 if (do_verify) { verify(); }
                 report();
                 if (do_strategic) { strategic(); }
+                if (do_howdraw) { howdraw(); }
+                if (do_rule) { rule(); }
+                if (do_rulefix) { rulefix(); }
+                if (do_rulestat) { rulestat(); }
+                if (do_anyrule) { anyrule(); }
                 if (!pos.empty()) {
                         St s;
                         auto const rs = pos[0];
