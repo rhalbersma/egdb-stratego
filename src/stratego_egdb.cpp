@@ -30,6 +30,9 @@
 //   entry; only for databases in which red is the only side that can win (e.g. KL-LS).
 // -bits <key>: win/draw bits for red to move plus distances where red is free (only red can win); -check <key> also
 //   builds it normally and compares every state. With -load the bits are read from dump/ (then -pos works on them).
+// -strategic (before -bits): list the positions with nobody restricted that are drawn whichever side is to move.
+// -realdraw <key>|all: which draws survive the more-squares (chasing) rule: blue must keep the draw with finitely many
+//   attacks (moves next to a red piece it threatens).
 // -prefer: in main lines the winner prefers moving its lowest piece towards the opponent's lowest piece (among the
 //   moves that keep the fastest win).
 // -pos <red> <blue> <r|b>: after building or loading, print the value, a diagram and the main line of one position,
@@ -46,6 +49,7 @@
 #include <format>
 #include <iostream>
 #include <map>
+#include <omp.h>
 #include <memory>
 #include <string>
 #include <vector>
@@ -65,6 +69,8 @@ inline int rev(int d) { return d ^ 2; }
 // Tweeveldenregel limit: a piece may make at most K consecutive moves between the same two squares (K = 3: count 0..2).
 // K = 0 means unlimited (no restriction state at all).
 int K = 3;
+std::string realdraw_key;               // -realdraw <key>: which draws survive the more-squares (chasing) rule
+bool noattack = false;                  // -noattack: variant in which blue may not move a piece next to a red piece it threatens
 bool load = false;      // -load: read existing databases from dump/ instead of computing them
 inline bool unlimited() { return K == 0; }
 
@@ -383,6 +389,14 @@ int for_each_move(Pos const& p, F&& f)
                 for (auto d = 0; d < 4; ++d) {
                         auto const to = nb[from][d];
                         if (to < 0 || p.side[me].at(to) >= 0 || !allowed(p.side[me].r, from, d)) { continue; }
+                        if (noattack && me == 1 && p.side[op].at(to) < 0) {     // blue approaches a red piece it threatens: not allowed
+                                auto threat = false;
+                                for (auto y : nb[to]) {
+                                        auto const t = y >= 0 ? p.side[op].at(y) : -1;
+                                        if (t >= 0 && y != from && attack(p.side[me].rk[i], p.side[op].rk[t]) >= 0) { threat = true; }
+                                }
+                                if (threat) { continue; }
+                        }
                         ++n;
                         auto c = p;
                         c.stm = op;
@@ -941,6 +955,96 @@ BitsDb build_bits(Slice const& base, std::string const& key)
 }
 
 std::unique_ptr<BitsDb> bits_db;        // the -bits database, for -pos
+bool walk = false;                      // -walk (with -bits and -pos): red brings the king to the blue lieutenant, blue holds
+bool strategic = false;                 // -strategic: list the states drawn with either side to move (nobody restricted)
+
+
+// -walk: from a red-to-move position of the bits database, red walks its king towards the blue lieutenant (and takes a
+// win as soon as one exists); blue answers with a move that keeps the draw, preferring lieutenant moves. Prints the line
+// with the value after every move.
+void walk_line(BitsDb& db, Pos p, int plies)
+{
+        auto const red_value = [&](Pos const& q) { return db.W.test(encode(db.sl, q)); };       // red to move wins?
+        std::cout << "lijn (rood brengt de kapitein naar de blauwe luitenant):";
+        auto move = 1;
+        for (auto ply = 0; ply < plies; ++ply) {
+                if (p.side[0].n < 2 || p.side[1].n < 2) { std::cout << " (slag: andere database)"; break; }
+                auto const me = p.stm;
+                Pos best{}; auto best_score = -1000000; int bf = -1, bt = -1; auto win_found = false;
+                auto cap = false;
+                for_each_move(p, [&](Pos const& c, bool in, auto from, auto to) {
+                        auto score = 0;
+                        if (!in) {                                              // a capture: value from the smaller database
+                                auto const v = child_value(c);
+                                auto const red_wins = v < DRAW && (bool(v & 1) == (c.stm == 0));
+                                if (me == 1 && !red_wins) { score = -1; }       // blue: a capture that keeps the draw (only when needed)
+                                else if (me == 0 && red_wins) { score = 100000; }
+                                else { return; }
+                                if (score > best_score) { best_score = score; best = c; bf = from; bt = to; win_found = score >= 100000; cap = true; }
+                                return;
+                        }
+                        if (me == 0) {
+                                auto const lost = blue_value(db, c).first;      // blue to move after this red move
+                                if (lost) { score = 100000; }
+                                else {
+                                        auto const ki = p.side[0].at(from);
+                                        auto const bl = c.side[1].sq[0];
+                                        auto const rl = c.side[0].sq[1];                // the red lieutenant after the move
+                                        auto const attacked = dist[p.side[0].sq[1]][p.side[1].sq[0]] == 1;
+                                        if (dist[rl][bl] == 1) { return; }              // never leave the lieutenants side by side
+                                        if (attacked) { score = p.side[0].rk[ki] != p.side[0].rk[0] ? 1000 : -100000; }   // dodge with the L
+                                        else { score = p.side[0].rk[ki] == p.side[0].rk[0] ? -dist[to][bl] : -100; }      // king towards the blue L
+                                }
+                        } else {
+                                if (red_value(c)) { return; }                   // only drawing blue moves
+                                score = p.side[1].rk[p.side[1].at(from)] == p.side[1].rk[0] ? 1 : 0;
+                        }
+                        if (score > best_score) { best_score = score; best = c; bf = from; bt = to; win_found = score >= 100000; cap = false; }
+                });
+                if (bf < 0) { std::cout << (me == 1 ? " (blauw heeft geen remisezet meer: rood wint)" : " (geen zet)"); break; }
+                if (me == 0) { std::cout << std::format(" {}.", move); }
+                std::cout << ' ' << letter(p.side[me].rk[p.side[me].at(bf)]) << nm(bf) << (cap ? 'x' : '-') << nm(bt);
+                if (cap) { std::cout << (me == 1 ? " (ruil, daarna remise)" : " (slag, rood wint)"); break; }
+                if (me == 0 && win_found) { std::cout << " (wint!)"; break; }
+                if (me == 1) { ++move; }
+                p = best;
+        }
+        std::cout << '\n';
+}
+
+// -strategic: every placement in which nobody is restricted and the result is a draw whichever side is to move
+void list_strategic(BitsDb& db, std::string const& key)
+{
+        auto& sl = db.sl;
+        auto const stride = sl.ws * sl.bs;
+        std::vector<std::vector<std::string>> found(64);
+        std::uint64_t total = 0, drawn_r = 0, drawn_b = 0, both = 0;
+#pragma omp parallel for schedule(dynamic, 1 << 10) reduction(+ : total, drawn_r, drawn_b, both)
+        for (std::int64_t pp = 0; pp < static_cast<std::int64_t>(sl.place); ++pp) {
+                auto const i = static_cast<std::uint64_t>(pp) * stride;
+                auto const r = decode(sl, i, 0);
+                if (!valid(r)) { continue; }
+                ++total;
+                auto const dr = !db.W.test(i);
+                auto const db_ = !blue_value(db, decode(sl, i, 1)).first;
+                drawn_r += dr; drawn_b += db_;
+                if (dr && db_) {
+                        ++both;
+                        std::string line;
+                        for (auto sd = 0; sd < 2; ++sd) {
+                                for (auto k = 0; k < r.side[sd].n; ++k) { line += std::format("{}{}{} ", sd == 0 ? "r" : "b", letter(r.side[sd].rk[k]), nm(r.side[sd].sq[k])); }
+                        }
+                        found[std::size_t(omp_get_thread_num()) % 64].push_back(line);
+                }
+        }
+        auto const name = std::format("dump/strategic_k{}_{}.txt", unlimited() ? std::string("inf") : std::to_string(K), key);
+        if (auto f = std::fopen(name.c_str(), "w")) {
+                for (auto const& v : found) { for (auto const& l : v) { std::fputs((l + "\n").c_str(), f); } }
+                std::fclose(f);
+        }
+        std::cout << std::format("{:6} strategisch: {} plaatsingen (symmetrisch, niemand beperkt), remise rood aan zet {}, blauw aan zet {}, beide {} ({:.2f}%) -> {}\n",
+                key, total, drawn_r, drawn_b, both, 100.0 * double(both) / double(total), name) << std::flush;
+}
 
 // statistics of a bits database (red to move from the bits, blue to move by one ply)
 void report_bits(BitsDb& db, std::string const& key)
@@ -1002,6 +1106,195 @@ void check_bits_against(Slice const& sl, BitsDb& db, std::string const& key)
         std::cout << std::format("{:6} check: {} toestanden, {} uitslagverschillen; {} afstanden vergeleken, {} verschillen\n", key, states, wdl, dists, dist) << std::flush;
 }
 
+// -noattack: forward solver (no unmoves), synchronous by plies: a state is a win in n (odd) if a move reaches a loss in
+// n - 1, a loss in n (even) if every move reaches a win of at most n - 1 and one of exactly n - 1.
+void forward_solve(Slice& sl)
+{
+        auto const size = sl.size;
+        sl.val.assign(2 * size, UNKNOWN);
+#pragma omp parallel for schedule(dynamic, 1 << 14)
+        for (std::int64_t ii = 0; ii < static_cast<std::int64_t>(size); ++ii) {
+                for (auto s = 0; s < 2; ++s) { if (!valid(decode(sl, std::uint64_t(ii), s))) { sl.val[std::uint64_t(ii) * 2 + s] = INVALID; } }
+        }
+        auto quiet = 0;
+        for (auto n = 0; n < 1000 && quiet < 6; ++n) {
+                std::uint64_t changed = 0;
+#pragma omp parallel for schedule(dynamic, 1 << 14) reduction(+ : changed)
+                for (std::int64_t ii = 0; ii < static_cast<std::int64_t>(size); ++ii) {
+                        auto const i = static_cast<std::uint64_t>(ii);
+                        for (auto s = 0; s < 2; ++s) {
+                                if (sl.val[i * 2 + s] != UNKNOWN) { continue; }
+                                auto const p = decode(sl, i, s);
+                                auto win = false, all_win = true, any_last = false;
+                                auto const cnt = for_each_move(p, [&](Pos const& c, bool, auto&&...) {
+                                        auto const v = backup(child_value(c));          // value for the side to move, child already decided or DRAW/unknown
+                                        if (v >= DRAW || v > n) { all_win = false; return; }
+                                        if (v & 1) { if (v == n) { win = true; } all_win = false; return; }
+                                        if (v == n) { any_last = true; }
+                                        if (v > n) { all_win = false; }
+                                });
+                                value_t r = UNKNOWN;
+                                if (cnt == 0) { if (n == 0) { r = terminal(p); } }
+                                else if (n % 2 == 1 && win) { r = static_cast<value_t>(n); }
+                                else if (n % 2 == 0 && all_win && any_last) { r = static_cast<value_t>(n); }
+                                if (r != UNKNOWN) { sl.val[i * 2 + s] = r; ++changed; }
+                        }
+                }
+                quiet = changed == 0 ? quiet + 1 : 0;
+        }
+        std::ranges::replace(sl.val, UNKNOWN, DRAW);
+}
+
+std::unique_ptr<Pos> trace;              // -trace (with -realdraw and -pos): explain one state
+bool chase_equal_only = false;          // (no longer used)
+
+// Is this blue move a chasing move in the sense of ISF rule 11 (more-squares rule)? To threaten is to move a piece next to
+// an opponent piece (any rank); to evade is to move the threatened piece away in the very next move; a chasing move
+// threatens an opponent piece (any one) while the opponent keeps evading: red's last move moved a threatened piece
+// away. Exception 11.2: a chasing move back to the square the chasing piece came from
+// in the directly preceding turn is allowed, but it does not interrupt the chase. The two-square state tells
+// which piece of each side moved last and where it came from. At k = inf this is not known: then every move next to a
+// red piece counts.
+inline bool blue_attack(Pos const& p, int from, int to)
+{
+        if (p.stm != 1 || p.side[0].at(to) >= 0) { return false; }
+        if (unlimited()) { for (auto y : nb[to]) { if (y >= 0 && p.side[0].at(y) >= 0) { return true; } } return false; }
+        // (exception 11.2, back to the previous square, is allowed but does not end the continuous chase; a pure pendulum
+        // is limited by the two-square rule, which is in the state)
+        auto const& R = p.side[0].r;                    // red's last move: from prev to R.sq
+        if (R.sq < 0) { return false; }
+        auto const prev = nb[R.sq][R.dir];
+        if (prev < 0) { return false; }
+        // active chase: blue's last move threatened the red piece (blue's last moved piece stands next to the square that
+        // red piece came from) and red's last move evaded with exactly that piece
+        auto const& Rb = p.side[1].r;
+        if (Rb.sq < 0) { return false; }
+        auto threatened_by_last = false;
+        for (auto z : nb[prev]) { if (z == Rb.sq) { threatened_by_last = true; } }
+        if (!threatened_by_last) { return false; }
+        for (auto y : nb[to]) { if (y >= 0 && p.side[0].at(y) >= 0) { return true; } }    // threatening any red piece
+        return false;
+}
+
+// Is this red move a chasing move? Mirror of blue_attack: red moves next to a blue piece it threatens that has just
+// evaded (its last move started next to a red piece that threatened it).
+inline bool red_chase(Pos const& p, int from, int to)
+{
+        if (p.stm != 0 || p.side[1].at(to) >= 0 || unlimited()) { return false; }
+        auto const i = p.side[0].at(from);
+        auto const& R = p.side[1].r;
+        auto const prev = R.sq >= 0 ? nb[R.sq][R.dir] : -1;
+        for (auto y : nb[to]) {
+                auto const t = y >= 0 ? p.side[1].at(y) : -1;
+                if (t < 0 || attack(p.side[0].rk[i], p.side[1].rk[t]) < 0 || y != R.sq || prev < 0) { continue; }
+                for (auto z : nb[prev]) {
+                        auto const b = z >= 0 ? p.side[0].at(z) : -1;
+                        if (b >= 0 && attack(p.side[0].rk[b], p.side[1].rk[t]) >= 0) { return true; }
+                }
+        }
+        return false;
+}
+
+// -realdraw: the draws of a database are only bounds under the more-squares (chasing) rule. Red wins a draw only if it
+// can force blue to chase forever while red itself chases only finitely often (a mutual chase stays a draw).
+// Phase 1, red without chasing moves: Z (greatest fixpoint) are the draws blue keeps forever without chasing, A (least
+// fixpoint) those from which blue reaches Z with finitely many chases; repeat with A until stable. Phase 2: red may use
+// chasing moves finitely often to reach the draws it wins in phase 1 (attractor). A draw in a smaller database counts
+// as real. A red state without any non-chasing move counts as kept by blue (red has to chase).
+void real_draws(Slice const& sl, std::string const& key)
+{
+        auto const size = sl.size;
+        std::vector<std::uint8_t> D0(2 * size, 0), D, Z, A;
+        std::uint64_t draws0 = 0;
+        for (auto i = 0uz; i < 2 * size; ++i) { if (sl.val[i] == DRAW) { D0[i] = 1; ++draws0; } }
+        D = D0;
+        auto const sweep = [&](auto&& step) {
+                std::uint64_t changed = 0;
+#pragma omp parallel for schedule(dynamic, 1 << 14) reduction(+ : changed)
+                for (std::int64_t ii = 0; ii < static_cast<std::int64_t>(size); ++ii) {
+                        for (auto s = 0; s < 2; ++s) { changed += step(static_cast<std::uint64_t>(ii), s); }
+                }
+                return changed;
+        };
+        auto const in_set = [&](std::vector<std::uint8_t> const& X, Pos const& c, bool in) { return in ? bool(X[encode(sl, c) * 2 + std::uint64_t(c.stm)]) : child_value(c) >= DRAW; };
+        // Buechi for blue: a chase is allowed as long as the chaser repeats no position (11.1), so blue keeps a draw if it can
+        // make a non-chasing move infinitely often while staying in the draws; a continuous chase forever would repeat.
+        // X (greatest fixpoint): Y = states from which blue can force a non-chasing move into X (least fixpoint), X := Y.
+        (void)Z;
+        auto rounds = 0;
+        for (;; ++rounds) {
+                A.assign(2 * size, 0);
+                while (sweep([&](std::uint64_t i, int s) -> std::uint64_t {
+                        if (!D[i * 2 + s] || A[i * 2 + s]) { return 0; }
+                        auto const p = decode(sl, i, s);
+                        auto ok = s == 0;
+                        for_each_move(p, [&](Pos const& c, bool in, auto from, auto to) {
+                                if (s == 1) {
+                                        if (!in) { if (child_value(c) >= DRAW) { ok = true; } return; }   // capture into a drawn smaller database
+                                        auto const ci = encode(sl, c) * 2 + std::uint64_t(c.stm);
+                                        if ((D[ci] && !blue_attack(p, from, to)) || A[ci]) { ok = true; }
+                                } else {
+                                        if (!in) { if (child_value(c) < DRAW) { ok = false; } return; }
+                                        if (!A[encode(sl, c) * 2 + std::uint64_t(c.stm)]) { ok = false; }
+                                }
+                        });
+                        if (ok) { A[i * 2 + s] = 1; return 1; }
+                        return 0;
+                }) > 0) {}
+                if (A == D) { break; }
+                D = A;
+        }
+        if (trace) {            // explain why the traced state left the phase-1 draws (two plies deep)
+                auto const show = [&](Pos const& q, int depth, auto&& self) -> void {
+                        auto const qi = encode(sl, q);
+                        std::cout << std::string(2 * depth + 6, ' ') << describe(q) << (q.stm == 0 ? " rood" : " blauw") << " aan zet, in D: " << int(D[qi * 2 + std::uint64_t(q.stm)]) << "\n";
+                        if (depth >= 2 || D[qi * 2 + std::uint64_t(q.stm)]) { return; }
+                        for_each_move(q, [&](Pos const& c, bool in, auto from, auto to) {
+                                auto const ch = q.stm == 0 ? red_chase(q, from, to) : blue_attack(q, from, to);
+                                auto const inD = in ? int(D[encode(sl, c) * 2 + std::uint64_t(c.stm)]) : (child_value(c) >= DRAW ? 2 : -1);
+                                std::cout << std::string(2 * depth + 8, ' ') << nm(from) << (in ? '-' : 'x') << nm(to) << (ch ? " (achtervolging)" : "") << " -> in D: " << inD << "\n";
+                                if (in && !inD && !ch && depth < 1) { self(c, depth + 1, self); }
+                        });
+                };
+                show(*trace, 0, show);
+        }
+        std::array<std::array<std::uint64_t, 2>, 2> fresh{};    // [stm][real draws, all draws]
+        std::uint64_t real = 0;
+        for (auto i = 0uz; i < size; ++i) {
+                for (auto s = 0; s < 2; ++s) {
+                        if (sl.val[i * 2 + s] != DRAW) { continue; }
+                        real += D[i * 2 + s];
+                        if (i % (sl.ws * sl.bs) == 0) { ++fresh[s][1]; fresh[s][0] += D[i * 2 + s]; }
+                }
+        }
+        std::cout << std::format("{:6} meerveldenregel: {} van {} remises echt ({} rondes); niemand beperkt: rood aan zet {} van {}, blauw aan zet {} van {}\n",
+                key, real, draws0, rounds + 1, fresh[0][0], fresh[0][1], fresh[1][0], fresh[1][1]) << std::flush;
+        {       // every placement with nobody restricted that is a draw with either side to move: real (1) or chasing-only (0)
+                auto const name = std::format("dump/realdraw_k{}_{}.txt", unlimited() ? std::string("inf") : std::to_string(K), key);
+                if (auto f = std::fopen(name.c_str(), "w")) {
+                        for (auto i = 0uz; i < size; i += sl.ws * sl.bs) {
+                                if (sl.val[i * 2] != DRAW || sl.val[i * 2 + 1] != DRAW) { continue; }
+                                auto const p = decode(sl, i, 0);
+                                std::string line;
+                                for (auto sd = 0; sd < 2; ++sd) { for (auto k = 0; k < p.side[sd].n; ++k) { line += std::format("{}{}{} ", sd == 0 ? "r" : "b", letter(p.side[sd].rk[k]), nm(p.side[sd].sq[k])); } }
+                                line += std::format("{} {}\n", int(D[i * 2]), int(D[i * 2 + 1]));
+                                std::fputs(line.c_str(), f);
+                        }
+                        std::fclose(f);
+                }
+        }
+        for (auto s = 0; s < 2; ++s) {         // a few examples, nobody restricted: real draws and draws only kept by chasing
+                auto shown_real = 0, shown_fake = 0;
+                for (auto i = 0uz; i < size && (shown_real < 3 || shown_fake < 3); i += sl.ws * sl.bs) {
+                        if (sl.val[i * 2 + s] != DRAW) { continue; }
+                        auto& c = D[i * 2 + s] ? shown_real : shown_fake;
+                        if (c >= 3) { continue; }
+                        ++c;
+                        std::cout << std::format("       {} aan zet, {}: {}\n", s == 0 ? "rood" : "blauw", D[i * 2 + s] ? "echte remise" : "remise alleen door achtervolgen", describe(decode(sl, i, s)));
+                }
+        }
+}
+
 void build(std::string const& red0, std::string const& blue0)
 {
         std::array<std::vector<int>, 2> rk;
@@ -1045,14 +1338,33 @@ void build(std::string const& red0, std::string const& blue0)
         sl.size = sl.place * sl.ws * sl.bs;
         auto const size = sl.size;
         if (sl.lean) { build_lean(sl, key, t0); return; }
-        if (key == bits_key && !check_bits) { bits_db = std::make_unique<BitsDb>(build_bits(sl, key)); if (!load) { report_bits(*bits_db, key); } return; }
+        if (noattack) {
+                forward_solve(sl);
+                std::array<std::array<std::uint64_t, 3>, 2> cntv{};
+                for (auto s = 0; s < 2; ++s) {
+                        for (auto i = std::uint64_t{0}; i < size; ++i) {
+                                auto const v = sl.val[i * 2 + s];
+                                if (v == INVALID || i % (sl.ws * sl.bs) != 0) { continue; }
+                                ++cntv[s][v >= DRAW ? 1 : ((s == 0) == bool(v & 1)) ? 0 : 2];
+                        }
+                }
+                std::cout << std::format("{:6} zonder aanvallen door blauw, niemand beperkt: rood aan zet rood/remise/blauw {}/{}/{}, blauw aan zet {}/{}/{}\n",
+                        key, cntv[0][0], cntv[0][1], cntv[0][2], cntv[1][0], cntv[1][1], cntv[1][2]) << std::flush;
+                return;
+        }
+        if (key == bits_key && !check_bits) {
+                bits_db = std::make_unique<BitsDb>(build_bits(sl, key));
+                if (!load) { report_bits(*bits_db, key); }
+                if (strategic) { list_strategic(*bits_db, key); }
+                return;
+        }
         sl.val.assign(2 * size, UNKNOWN);
         if (load) {
                 auto const base = std::format("dump/k{}_{}.db", unlimited() ? std::string("inf") : std::to_string(K), key);
                 if (auto f = std::fopen((base + "16").c_str(), "rb")) {
                         auto const got = std::fread(sl.val.data(), sizeof(value_t), sl.val.size(), f);
                         std::fclose(f);
-                        if (got == sl.val.size()) { std::cout << std::format("{:6} geladen uit {}16\n", key, base); return; }
+                        if (got == sl.val.size()) { std::cout << std::format("{:6} geladen uit {}16\n", key, base); if (key == realdraw_key) { real_draws(sl, key); } return; }
                 } else if (auto g = std::fopen(base.c_str(), "rb")) {
                         std::vector<std::uint8_t> b(sl.val.size());
                         auto const got = std::fread(b.data(), 1, b.size(), g);
@@ -1060,6 +1372,7 @@ void build(std::string const& red0, std::string const& blue0)
                         if (got == b.size()) {
                                 for (auto i = 0uz; i < b.size(); ++i) { sl.val[i] = b[i] == 253 ? INVALID : b[i] == 254 ? DRAW : b[i]; }
                                 std::cout << std::format("{:6} geladen uit {}\n", key, base);
+                                if (key == realdraw_key) { real_draws(sl, key); }
                                 return;
                         }
                 }
@@ -1269,6 +1582,7 @@ void build(std::string const& red0, std::string const& blue0)
                 pv(p);
                 std::cout << '\n';
         }
+        if (key == realdraw_key || realdraw_key == "all") { real_draws(sl, key); }
         if (key == bits_key && check_bits) { auto db = build_bits(sl, key); report_bits(db, key); check_bits_against(sl, db, key); }
         std::cout << std::flush;
 }
@@ -1304,11 +1618,36 @@ int main(int argc, char* argv[])
         if (a < argc && std::string(argv[a]) == "-load") { load = true; ++a; }
         if (a < argc && std::string(argv[a]) == "-prefer") { prefer = true; ++a; }
         if (a + 1 < argc && std::string(argv[a]) == "-lean") { lean_key = argv[a + 1]; a += 2; }
+        if (a < argc && std::string(argv[a]) == "-strategic") { strategic = true; ++a; }
+        if (a < argc && std::string(argv[a]) == "-walk") { walk = true; ++a; }
+        if (a < argc && std::string(argv[a]) == "-noattack") { noattack = true; ++a; }
+        if (a + 1 < argc && std::string(argv[a]) == "-realdraw") { realdraw_key = argv[a + 1]; a += 2; }
+        if (a < argc && std::string(argv[a]) == "-chase-equal") { chase_equal_only = true; ++a; }
+        auto trace_on = false;
+        if (a < argc && std::string(argv[a]) == "-trace") { trace_on = true; ++a; }
         if (a + 1 < argc && (std::string(argv[a]) == "-bits" || std::string(argv[a]) == "-check")) { check_bits = std::string(argv[a]) == "-check"; bits_key = argv[a + 1]; a += 2; }
         // -pos <red> <blue> <r|b>, e.g. -pos Le5,Se1 Lf2 r: diagram and main line (the databases must be built or loaded)
         std::array<std::string, 3> pos_arg{};
         auto have_pos = false;
         for (auto b = a; b < argc; ++b) { if (std::string(argv[b]) == "-pos" && b + 3 < argc) { pos_arg = { argv[b + 1], argv[b + 2], argv[b + 3] }; have_pos = true; argc = b; break; } }
+        if (trace_on && have_pos) {
+                Pos p;
+                for (auto sd = 0; sd < 2; ++sd) {
+                        auto const& t = pos_arg[sd];
+                        for (std::size_t i = 0; i < t.size();) {
+                                auto const j = std::min(t.find(',', i), t.size());
+                                auto const tok = t.substr(i, j - i);
+                                auto const f = tok[1] - 'a', r = std::stoi(tok.substr(2)) - 1;
+                                for (auto x = 0; x < N; ++x) { if (fo[x] == f && ro[x] == r) { p.side[sd].sq[p.side[sd].n] = x; } }
+                                p.side[sd].rk[p.side[sd].n++] = rank_of(tok[0]);
+                                i = j + 1;
+                        }
+                        p.side[sd].normalise();
+                }
+                p.stm = pos_arg[2] == "r" ? 0 : 1;
+                canonicalise(p);
+                trace = std::make_unique<Pos>(p);
+        }
         for (; a + 1 < argc; a += 2) {
                 std::string red = argv[a], blue = argv[a + 1];
                 auto const desc = [](std::string& s) { std::ranges::sort(s, [](char x, char y) { return rank_of(x) > rank_of(y); }); };
@@ -1343,6 +1682,7 @@ int main(int argc, char* argv[])
                                         std::cout << "\nwaarde voor de kant aan zet (bits): " << (!lost ? std::string("remise") : L >= 0 ? std::format("verlies in {} plies", L) : std::string("verlies")) << "\n";
                                 }
                                 diagram(p);
+                                if (walk && q.stm == 0) { walk_line(*bits_db, q, 60); }
                                 return 0;
                         }
                 }
