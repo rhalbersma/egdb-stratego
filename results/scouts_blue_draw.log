@@ -1,0 +1,105 @@
+=== qa k=inf
+strategische remises (niemand beperkt, remise met rood en met blauw aan zet): 13701 van 25665 plaatsingen (53.38%)
+per veld van de blauwe verkenner (kwadrant):
+  a1: 990  b1: 990  c1: 1225  d1: 990  a2: 990  b2: 990  c2: 1225  d2: 990  a3: 990  b3: 990  c3: 1225  d3: 990  a4: 372  b4: 372  d4: 372
+
+alle toestanden: 24195 remisestellingen met blauw aan zet
+  elke veilige zet houdt remise: 53.65%, minstens een veilige zet verliest: 46.35%, remise alleen via een onveilige zet: 0.0000%
+  gemiddeld 7.8 veilige zetten, waarvan 6.9 remise houden
+  verliezende veilige zetten per doelveld (% van de veilige zetten naar dat veld, gevouwen naar het kwadrant):
+     70.0  70.0     ~  70.0
+      0.0   0.0   0.0   0.0
+      0.0   0.0   0.0   0.0
+      0.0   0.0   0.0   0.0
+
+niemand beperkt: 24195 remisestellingen met blauw aan zet
+  elke veilige zet houdt remise: 53.65%, minstens een veilige zet verliest: 46.35%, remise alleen via een onveilige zet: 0.0000%
+  gemiddeld 7.8 veilige zetten, waarvan 6.9 remise houden
+  verliezende veilige zetten per doelveld (% van de veilige zetten naar dat veld, gevouwen naar het kwadrant):
+     70.0  70.0     ~  70.0
+      0.0   0.0   0.0   0.0
+      0.0   0.0   0.0   0.0
+      0.0   0.0   0.0   0.0
+vuistregel 1: 24195 remisestellingen (blauw aan zet): regelzet bestaat 94.706%, elke regelzet houdt remise 94.706%, een regelzet houdt remise 94.706%
+  blauw staat al volgens de regel: 14958 stellingen, regelzet bestaat en elke regelzet houdt remise: 100.0000%
+vuistregel 2: 24195 remisestellingen (blauw aan zet): regelzet bestaat 94.706%, elke regelzet houdt remise 94.706%, een regelzet houdt remise 94.706%
+  blauw staat al volgens de regel: 14958 stellingen, regelzet bestaat en elke regelzet houdt remise: 100.0000%
+vuistregel 1 als enige strategie: strategische remises gehouden: rood aan zet 9039 / blauw aan zet 13701 / beide 9039 van 13701; alle remises blauw aan zet: 94.706%
+vuistregel 2 als enige strategie: strategische remises gehouden: rood aan zet 9039 / blauw aan zet 13701 / beide 9039 van 13701; alle remises blauw aan zet: 94.706%
+regelzetten uit het open veld: telling bereikt K: 0 zetten, -nan% verliest; anders: 89100 zetten, 0.00% verliest
+blauw stond op slag: 0.00% verliest (25830 zetten); niet op slag: 0.00% verliest (63270 zetten)
+willekeurige regelzet (eerst zonder telling K): strategische remises gehouden: rood aan zet 9039 / blauw aan zet 13701 van 13701
+niet gehouden met blauw aan zet, per blauw veld:
+=== qa k=2
+strategische remises (niemand beperkt, remise met rood en met blauw aan zet): 10602 van 25665 plaatsingen (41.31%)
+per veld van de blauwe verkenner (kwadrant):
+  a1: 990  b1: 990  c1: 406  d1: 990  a2: 990  b2: 990  c2: 316  d2: 990  a3: 990  b3: 990  c3: 286  d3: 990  a4: 372  b4: 84  d4: 228
+
+alle toestanden: 102093624 remisestellingen met blauw aan zet
+  elke veilige zet houdt remise: 15.55%, minstens een veilige zet verliest: 84.45%, remise alleen via een onveilige zet: 0.3349%
+  gemiddeld 6.5 veilige zetten, waarvan 4.7 remise houden
+  verliezende veilige zetten per doelveld (% van de veilige zetten naar dat veld, gevouwen naar het kwadrant):
+     76.8  91.1     ~  84.9
+      1.6   1.0  79.4   0.0
+      2.3   1.8  76.9   0.9
+      2.8   2.4  71.0   1.5
+
+niemand beperkt: 23040 remisestellingen met blauw aan zet
+  elke veilige zet houdt remise: 10.98%, minstens een veilige zet verliest: 89.02%, remise alleen via een onveilige zet: 0.0000%
+  gemiddeld 8.1 veilige zetten, waarvan 6.0 remise houden
+  verliezende veilige zetten per doelveld (% van de veilige zetten naar dat veld, gevouwen naar het kwadrant):
+     73.3  93.8     ~  83.5
+      0.0   0.0  75.5   0.0
+      0.0   0.0  73.5   0.0
+      0.0   0.0  67.5   0.0
+vuistregel 1: 102093624 remisestellingen (blauw aan zet): regelzet bestaat 99.246%, elke regelzet houdt remise 92.350%, een regelzet houdt remise 99.246%
+  blauw staat al volgens de regel: 80854784 stellingen, regelzet bestaat en elke regelzet houdt remise: 93.7094%
+vuistregel 2: 102093624 remisestellingen (blauw aan zet): regelzet bestaat 93.219%, elke regelzet houdt remise 93.219%, een regelzet houdt remise 93.219%
+  blauw staat al volgens de regel: 20816730 stellingen, regelzet bestaat en elke regelzet houdt remise: 92.1975%
+vuistregel 1 als enige strategie: strategische remises gehouden: rood aan zet 9039 / blauw aan zet 10602 / beide 9039 van 10602; alle remises blauw aan zet: 99.246%
+vuistregel 2 als enige strategie: strategische remises gehouden: rood aan zet 0 / blauw aan zet 0 / beide 0 van 10602; alle remises blauw aan zet: 0.000%
+regelzetten uit het open veld: telling bereikt K: 76671144 zetten, 6.44% verliest; anders: 292204308 zetten, 0.00% verliest
+blauw stond op slag: 1.03% verliest (112182402 zetten); niet op slag: 1.47% verliest (256693050 zetten)
+  lengte 1: 0.67% verliest
+  lengte 2: 1.03% verliest
+  lengte 3: 0.98% verliest
+  lengte 4: 1.21% verliest
+  lengte 5: 1.78% verliest
+  lengte 6: 2.71% verliest
+  lengte 7: 3.32% verliest
+willekeurige regelzet (eerst zonder telling K): strategische remises gehouden: rood aan zet 0 / blauw aan zet 0 van 10602
+niet gehouden met blauw aan zet, per blauw veld: a1:990 b1:990 c1:406 d1:990 a2:990 b2:990 c2:316 d2:990 a3:990 b3:990 c3:286 d3:990 a4:372 b4:84 d4:228
+=== classic k=inf
+strategische remises (niemand beperkt, remise met rood en met blauw aan zet): 58020 van 94185 plaatsingen (61.60%)
+per veld van de blauwe verkenner (kwadrant):
+  a1: 2628  b1: 2628  c1: 3081  d1: 3081  e1: 2628  a2: 2628  b2: 2628  c2: 3081  d2: 3081  e2: 2628  a3: 2628  b3: 2628  c3: 3081  d3: 3081  e3: 2628  a4: 2628  b4: 2628  c4: 3081  d4: 3081  e4: 2628  a5: 612  b5: 612  e5: 612
+
+alle toestanden: 90891 remisestellingen met blauw aan zet
+  elke veilige zet houdt remise: 55.68%, minstens een veilige zet verliest: 44.32%, remise alleen via een onveilige zet: 0.0000%
+  gemiddeld 10.5 veilige zetten, waarvan 9.7 remise houden
+  verliezende veilige zetten per doelveld (% van de veilige zetten naar dat veld, gevouwen naar het kwadrant):
+     80.7  80.7     ~     ~  80.7
+      0.0   0.0   0.0   0.0   0.0
+      0.0   0.0   0.0   0.0   0.0
+      0.0   0.0   0.0   0.0   0.0
+      0.0   0.0   0.0   0.0   0.0
+
+niemand beperkt: 90891 remisestellingen met blauw aan zet
+  elke veilige zet houdt remise: 55.68%, minstens een veilige zet verliest: 44.32%, remise alleen via een onveilige zet: 0.0000%
+  gemiddeld 10.5 veilige zetten, waarvan 9.7 remise houden
+  verliezende veilige zetten per doelveld (% van de veilige zetten naar dat veld, gevouwen naar het kwadrant):
+     80.7  80.7     ~     ~  80.7
+      0.0   0.0   0.0   0.0   0.0
+      0.0   0.0   0.0   0.0   0.0
+      0.0   0.0   0.0   0.0   0.0
+      0.0   0.0   0.0   0.0   0.0
+vuistregel 1: 90891 remisestellingen (blauw aan zet): regelzet bestaat 99.762%, elke regelzet houdt remise 99.762%, een regelzet houdt remise 99.762%
+  blauw staat al volgens de regel: 80712 stellingen, regelzet bestaat en elke regelzet houdt remise: 100.0000%
+vuistregel 2: 90891 remisestellingen (blauw aan zet): regelzet bestaat 99.762%, elke regelzet houdt remise 99.762%, een regelzet houdt remise 99.762%
+  blauw staat al volgens de regel: 80712 stellingen, regelzet bestaat en elke regelzet houdt remise: 100.0000%
+vuistregel 1 als enige strategie: strategische remises gehouden: rood aan zet 56268 / blauw aan zet 58020 / beide 56268 van 58020; alle remises blauw aan zet: 99.762%
+vuistregel 2 als enige strategie: strategische remises gehouden: rood aan zet 56268 / blauw aan zet 58020 / beide 56268 van 58020; alle remises blauw aan zet: 99.762%
+regelzetten uit het open veld: telling bereikt K: 0 zetten, -nan% verliest; anders: 800352 zetten, 0.00% verliest
+blauw stond op slag: 0.00% verliest (151848 zetten); niet op slag: 0.00% verliest (648504 zetten)
+willekeurige regelzet (eerst zonder telling K): strategische remises gehouden: rood aan zet 56268 / blauw aan zet 58020 van 58020
+niet gehouden met blauw aan zet, per blauw veld:

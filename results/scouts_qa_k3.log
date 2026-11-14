@@ -1,0 +1,33 @@
+bord qa (60 velden), k = 3: patronen per veld max 238, 25665 plaatsingen, 887714244 toestanden per kant aan zet, 1.78 GB
+seeds: 325471288 red wins in 1, 0 blue without a move (8 s)
+level   1: red wins    325471288 blue losses     37914130 (28 s)
+level   2: red wins    100133652 blue losses     17957096 (35 s)
+level   3: red wins     31872848 blue losses      2592496 (40 s)
+level   4: red wins      2846832 blue losses     11153354 (41 s)
+level   5: red wins     37614712 blue losses      9678232 (48 s)
+level   6: red wins     19428446 blue losses      2525760 (50 s)
+level   7: red wins      2274003 blue losses       504998 (51 s)
+level   8: red wins      1428480 blue losses       852998 (51 s)
+level   9: red wins      1014240 blue losses       152070 (51 s)
+built in 51 s
+weggeschreven: dump/scouts_qa_k3_VV-V.u8
+verification: 0 errors (48 s)
+
+VV-V, bord qa, k = 3: 887714244 toestanden per kant aan zet (symmetrisch; volledig x4)
+alle toestanden                  rood aan zet: winst rood  58.81% remise  41.19% (n = 887714244)  blauw aan zet: winst rood   9.39% remise  90.61% (n = 887714244)
+niemand beperkt                  rood aan zet: winst rood  58.69% remise  41.31% (n = 25665)  blauw aan zet: winst rood  10.23% remise  89.77% (n = 25665)
+niemand beperkt, niet op slag    rood aan zet: winst rood  35.39% remise  64.61% (n = 16410)  blauw aan zet: winst rood   0.00% remise 100.00% (n = 16410)
+langste winst: rood aan zet 17 plies, blauw aan zet 18 plies
+langste winst zonder beperking, rood aan zet: 17 plies, rood Va4 Va5, blauw Vc3
+    +-----------------+
+  8 | . . . . . . . . |
+  7 | . . . . . . . . |
+  6 | . . . . . . . . |
+  5 | V . ~ . . ~ . . |
+  4 | V . ~ . . ~ . . |
+  3 | . . v . . . . . |
+  2 | . . . . . . . . |
+  1 | . . . . . . . . |
+    +-----------------+
+      a b c d e f g h   (V rood, v blauw)
+PV: 1. Va4-a3 Vc3-c2 2. Va3-a2 Vc2-c1 3. Va2-a1 Vc1-c2 4. Va1-a2 Vc2-c3 5. Va5-a3 Vc3-c1 6. Va2-a1 Vc1-c2 7. Va1-a2 Vc2-c1 8. Va2-a1 Vc1-d1 9. Va1xd1

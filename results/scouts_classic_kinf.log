@@ -1,0 +1,30 @@
+bord classic (92 velden), k = inf: patronen per veld max 0, 94185 plaatsingen, 94185 toestanden per kant aan zet, 0.00 GB
+seeds: 28281 red wins in 1, 0 blue without a move (0 s)
+level   1: red wins        28281 blue losses         1458 (0 s)
+level   2: red wins         1740 blue losses         1740 (0 s)
+level   3: red wins         5872 blue losses           96 (0 s)
+level   4: red wins          272 blue losses            0 (0 s)
+built in 0 s
+weggeschreven: dump/scouts_classic_kinf_VV-V.u8
+verification: 0 errors (0 s)
+
+VV-V, bord classic, k = inf: 94185 toestanden per kant aan zet (symmetrisch; volledig x4)
+alle toestanden                  rood aan zet: winst rood  38.40% remise  61.60% (n = 94185)  blauw aan zet: winst rood   3.50% remise  96.50% (n = 94185)
+niemand beperkt                  rood aan zet: winst rood  38.40% remise  61.60% (n = 94185)  blauw aan zet: winst rood   3.50% remise  96.50% (n = 94185)
+niemand beperkt, niet op slag    rood aan zet: winst rood  11.96% remise  88.04% (n = 65904)  blauw aan zet: winst rood   0.00% remise 100.00% (n = 65904)
+langste winst: rood aan zet 7 plies, blauw aan zet 6 plies
+langste winst zonder beperking, rood aan zet: 7 plies, rood Vc1 Vd1, blauw Vb5
+    +---------------------+
+ 10 | . . . . . . . . . . |
+  9 | . . . . . . . . . . |
+  8 | . . . . . . . . . . |
+  7 | . . . . . . . . . . |
+  6 | . . ~ ~ . . ~ ~ . . |
+  5 | . v ~ ~ . . ~ ~ . . |
+  4 | . . . . . . . . . . |
+  3 | . . . . . . . . . . |
+  2 | . . . . . . . . . . |
+  1 | . . V V . . . . . . |
+    +---------------------+
+      a b c d e f g h i j   (V rood, v blauw)
+PV: 1. Vc1-b1 Vb5-a5 2. Vb1-a1 Va5-b5 3. Vd1-b1 Vb5-b6 4. Vb1xb6
